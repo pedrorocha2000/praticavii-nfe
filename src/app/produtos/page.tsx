@@ -186,6 +186,16 @@ export default function ProdutosPage() {
       return;
     }
 
+    if (formData.quantidade_estoque === undefined || formData.quantidade_estoque === null) {
+      toast.error('Quantidade em estoque é obrigatória');
+      return;
+    }
+
+    if (formData.quantidade_estoque < 0) {
+      toast.error('Quantidade em estoque não pode ser negativa');
+      return;
+    }
+
     if (formData.custo_compra <= 0) {
       toast.error('Custo de compra deve ser maior que zero');
       return;
@@ -193,11 +203,6 @@ export default function ProdutosPage() {
 
     if (formData.preco_venda <= 0) {
       toast.error('Preço de venda deve ser maior que zero');
-      return;
-    }
-
-    if (formData.quantidade_estoque < 0) {
-      toast.error('Quantidade em estoque não pode ser negativa');
       return;
     }
 
@@ -586,7 +591,7 @@ export default function ProdutosPage() {
               </div>
 
               <div>
-                <Label htmlFor="quantidade_estoque">Quantidade em Estoque</Label>
+                <Label htmlFor="quantidade_estoque">Quantidade em Estoque *</Label>
                 <Input
                   id="quantidade_estoque"
                   type="number"
@@ -594,6 +599,7 @@ export default function ProdutosPage() {
                   value={formData.quantidade_estoque}
                   onChange={(e) => setFormData({ ...formData, quantidade_estoque: Number(e.target.value) })}
                   placeholder="0"
+                  required
                 />
               </div>
 

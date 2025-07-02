@@ -366,6 +366,48 @@ export default function TransportadorasPage() {
       return;
     }
 
+    // Validar apelido/nome fantasia
+    if (!formData.nomefantasia.trim()) {
+      toast.error('Apelido/Nome Fantasia é obrigatório');
+      return;
+    }
+
+    // Validar RG/inscrição estadual (apenas para pessoa física)
+    if (formData.tipopessoa === 'F' && !formData.rg_inscricaoestadual.trim()) {
+      toast.error('RG é obrigatório para pessoa física');
+      return;
+    }
+
+    // Validar endereço
+    if (!formData.endereco.trim()) {
+      toast.error('Endereço é obrigatório');
+      return;
+    }
+
+    // Validar número
+    if (!formData.numero.trim()) {
+      toast.error('Número é obrigatório');
+      return;
+    }
+
+    // Validar bairro
+    if (!formData.bairro.trim()) {
+      toast.error('Bairro é obrigatório');
+      return;
+    }
+
+    // Validar CEP
+    if (!formData.cep.trim()) {
+      toast.error('CEP é obrigatório');
+      return;
+    }
+
+    // Validar telefone
+    if (!formData.telefone.trim()) {
+      toast.error('Telefone é obrigatório');
+      return;
+    }
+
     // Validar CPF/CNPJ apenas se for Brasil e se tiver valor
     if (selectedCidade && selectedCidade.nomepais?.toLowerCase() === 'brasil' && formData.cpfcnpj) {
       if (!validateCPFCNPJ(formData.cpfcnpj)) {
@@ -672,7 +714,7 @@ export default function TransportadorasPage() {
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="md:col-span-2">
-                  <Label htmlFor="endereco">Endereço</Label>
+                  <Label htmlFor="endereco">Endereço *</Label>
                   <Input
                 id="endereco"
                 value={formData.endereco}
@@ -682,7 +724,7 @@ export default function TransportadorasPage() {
               />
             </div>
             <div>
-                  <Label htmlFor="numero">Número</Label>
+                  <Label htmlFor="numero">Número *</Label>
                   <Input
                 id="numero"
                 value={formData.numero}
@@ -704,7 +746,7 @@ export default function TransportadorasPage() {
               />
             </div>
             <div>
-                  <Label htmlFor="bairro">Bairro</Label>
+                  <Label htmlFor="bairro">Bairro *</Label>
                   <Input
                 id="bairro"
                 value={formData.bairro}
@@ -714,13 +756,14 @@ export default function TransportadorasPage() {
               />
             </div>
             <div>
-                  <Label htmlFor="cep">CEP</Label>
+                  <Label htmlFor="cep">CEP *</Label>
                   <Input
                 id="cep"
                 value={formData.cep}
-                onChange={(e) => setFormData({ ...formData, cep: e.target.value })}
+                onChange={(e) => setFormData({ ...formData, cep: e.target.value.slice(0, 15) })}
                     placeholder="CEP / Código Postal"
                 required
+                maxLength={15}
               />
             </div>
               </div>
@@ -744,13 +787,14 @@ export default function TransportadorasPage() {
                 </div>
                 <div>
                   <Label htmlFor="nomefantasia">
-                    {formData.tipopessoa === 'F' ? 'Apelido' : 'Nome Fantasia'}
+                    {formData.tipopessoa === 'F' ? 'Apelido *' : 'Nome Fantasia *'}
                   </Label>
                   <Input
                     id="nomefantasia"
                     value={formData.nomefantasia}
                     onChange={(e) => setFormData({ ...formData, nomefantasia: e.target.value })}
                     placeholder={formData.tipopessoa === 'F' ? 'Digite o apelido' : 'Digite o nome fantasia'}
+                    required
                   />
                 </div>
               </div>
@@ -797,26 +841,31 @@ export default function TransportadorasPage() {
                 </div>
             <div>
                   <Label htmlFor="rg_inscricaoestadual">
-                    {formData.tipopessoa === 'F' ? 'RG' : 'Inscrição Estadual'}
+                    {formData.tipopessoa === 'F' ? 'RG *' : 'Inscrição Estadual'}
                   </Label>
                   <Input
                     id="rg_inscricaoestadual"
                     value={formData.rg_inscricaoestadual}
                     onChange={(e) => setFormData({ ...formData, rg_inscricaoestadual: e.target.value })}
                     placeholder={formData.tipopessoa === 'F' ? 'Digite o RG' : 'Digite a inscrição estadual'}
+                    required={formData.tipopessoa === 'F'}
               />
             </div>
           </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-                  <Label htmlFor="telefone">Telefone</Label>
+                  <Label htmlFor="telefone">Telefone *</Label>
                   <Input
                 id="telefone"
                 value={formData.telefone}
-                onChange={(e) => setFormData({ ...formData, telefone: e.target.value })}
+                onChange={(e) => {
+                  const value = e.target.value.replace(/[^0-9\-\+\(\)\s]/g, '');
+                  setFormData({ ...formData, telefone: value.slice(0, 15) });
+                }}
                     placeholder="(00) 00000-0000"
                 required
+                maxLength={15}
               />
             </div>
             <div>

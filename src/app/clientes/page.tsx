@@ -475,7 +475,7 @@ export default function ClientesPage() {
     if (!selectedCliente) return;
 
     try {
-      const response = await fetch(`/api/clientes?codcli=${selectedCliente.codcli}&codpessoa=${selectedCliente.codpessoa}`, {
+      const response = await fetch(`/api/clientes?codcli=${selectedCliente.codcli}&force=true`, {
         method: 'DELETE',
       });
 
