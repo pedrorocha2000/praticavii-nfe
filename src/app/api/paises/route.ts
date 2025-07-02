@@ -17,43 +17,56 @@ export async function GET() {
 // POST - Criar novo país
 export async function POST(request: Request) {
   try {
-    const { codpais, nomepais } = await request.json();
+    const { siglapais, nomepais, situacao } = await request.json();
 
-    if (!codpais || !nomepais) {
+    if (!siglapais || !nomepais) {
       return NextResponse.json(
-        { error: 'Código e nome do país são obrigatórios' },
+        { error: 'Sigla e nome do país são obrigatórios' },
         { status: 400 }
       );
     }
 
-    // Validar o tamanho do código do país
-    if (codpais.length !== 2) {
+    // Validar o tamanho da sigla do país
+    if (siglapais.length !== 2) {
       return NextResponse.json(
-        { error: 'O código do país deve ter exatamente 2 caracteres' },
+        { error: 'A sigla do país deve ter exatamente 2 caracteres' },
         { status: 400 }
       );
     }
 
-    // Converter para maiúsculas
-    const codpaisUpper = codpais.toUpperCase();
+    // Converter sigla para maiúsculas
+    const siglapaisUpper = siglapais.toUpperCase();
+
+    // Verificar se a sigla já existe
+    const siglaExiste = await sql`
+      SELECT 1 FROM sistema_nfe.paises WHERE siglapais = ${siglapaisUpper}
+    `;
+
+    if (siglaExiste.length > 0) {
+      return NextResponse.json(
+        { error: 'Esta sigla de país já está em uso' },
+        { status: 400 }
+      );
+    }
 
     const novoPais = await sql`
-      INSERT INTO sistema_nfe.paises (codpais, nomepais)
-      VALUES (${codpaisUpper}, ${nomepais})
+      INSERT INTO sistema_nfe.paises (siglapais, nomepais, situacao)
+      VALUES (${siglapaisUpper}, ${nomepais}, ${situacao || null})
       RETURNING *
     `;
 
     return NextResponse.json(novoPais[0], { status: 201 });
   } catch (error: any) {
+    console.error('Erro ao criar país:', error);
+    
     // Verificar se é erro de chave duplicada
     if (error.code === '23505') {
       return NextResponse.json(
-        { error: 'Este código de país já está em uso' },
+        { error: 'Esta sigla de país já está em uso' },
         { status: 400 }
       );
     }
     
-    console.error('Erro ao criar país:', error);
     return NextResponse.json(
       { error: 'Erro ao criar país. Verifique os dados e tente novamente.' },
       { status: 500 }
@@ -64,18 +77,42 @@ export async function POST(request: Request) {
 // PUT - Atualizar país
 export async function PUT(request: Request) {
   try {
-    const { codpais, nomepais } = await request.json();
+    const { codpais, siglapais, nomepais, situacao } = await request.json();
 
-    if (!codpais || !nomepais) {
+    if (!codpais || !siglapais || !nomepais) {
       return NextResponse.json(
-        { error: 'Código e nome do país são obrigatórios' },
+        { error: 'Código, sigla e nome do país são obrigatórios' },
+        { status: 400 }
+      );
+    }
+
+    // Validar o tamanho da sigla do país
+    if (siglapais.length !== 2) {
+      return NextResponse.json(
+        { error: 'A sigla do país deve ter exatamente 2 caracteres' },
+        { status: 400 }
+      );
+    }
+
+    // Converter sigla para maiúsculas
+    const siglapaisUpper = siglapais.toUpperCase();
+
+    // Verificar se a sigla já existe em outro país
+    const siglaExiste = await sql`
+      SELECT 1 FROM sistema_nfe.paises 
+      WHERE siglapais = ${siglapaisUpper} AND codpais != ${codpais}
+    `;
+
+    if (siglaExiste.length > 0) {
+      return NextResponse.json(
+        { error: 'Esta sigla de país já está em uso' },
         { status: 400 }
       );
     }
 
     const paisAtualizado = await sql`
       UPDATE sistema_nfe.paises
-      SET nomepais = ${nomepais}
+      SET siglapais = ${siglapaisUpper}, nomepais = ${nomepais}, situacao = ${situacao || null}
       WHERE codpais = ${codpais}
       RETURNING *
     `;
@@ -86,6 +123,7 @@ export async function PUT(request: Request) {
 
     return NextResponse.json(paisAtualizado[0]);
   } catch (error) {
+    console.error('Erro ao atualizar país:', error);
     return NextResponse.json({ error: 'Erro ao atualizar país' }, { status: 500 });
   }
 }
@@ -103,6 +141,18 @@ export async function DELETE(request: Request) {
       );
     }
 
+    // Verificar se existem estados vinculados
+    const estadosVinculados = await sql`
+      SELECT 1 FROM sistema_nfe.estados WHERE codpais = ${codpais}
+    `;
+
+    if (estadosVinculados.length > 0) {
+      return NextResponse.json(
+        { error: 'Não é possível excluir o país pois existem estados vinculados' },
+        { status: 400 }
+      );
+    }
+
     const paisExcluido = await sql`
       DELETE FROM sistema_nfe.paises
       WHERE codpais = ${codpais}
@@ -115,6 +165,7 @@ export async function DELETE(request: Request) {
 
     return NextResponse.json({ message: 'País excluído com sucesso' });
   } catch (error) {
+    console.error('Erro ao excluir país:', error);
     return NextResponse.json({ error: 'Erro ao excluir país' }, { status: 500 });
   }
 } 

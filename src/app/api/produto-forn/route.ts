@@ -19,13 +19,12 @@ export async function GET(request: Request) {
       SELECT 
         pf.codprod,
         pf.codforn,
-        pf.valor_custo,
         p.nome as nome_produto,
         pes.nomerazao as nome_fornecedor
       FROM sistema_nfe.produto_forn pf
       JOIN sistema_nfe.produtos p ON p.codprod = pf.codprod
       JOIN sistema_nfe.fornecedores f ON f.codforn = pf.codforn
-      JOIN sistema_nfe.pessoa pes ON pes.codigo = f.codforn
+      JOIN sistema_nfe.pessoa pes ON pes.codigo = f.codpessoa
       WHERE ${codprod ? sql`pf.codprod = ${codprod}` : sql`pf.codforn = ${codforn}`}
       ORDER BY ${codprod ? sql`pes.nomerazao` : sql`p.nome`}
     `;
@@ -43,7 +42,7 @@ export async function GET(request: Request) {
 // POST - Criar novo relacionamento produto-fornecedor
 export async function POST(request: Request) {
   try {
-    const { codprod, codforn, valor_custo } = await request.json();
+    const { codprod, codforn } = await request.json();
 
     if (!codprod || !codforn) {
       return NextResponse.json(
@@ -90,10 +89,10 @@ export async function POST(request: Request) {
       );
     }
 
-    // Criar o relacionamento com valor_custo
+    // Criar o relacionamento
     const novoRelacionamento = await sql`
-      INSERT INTO sistema_nfe.produto_forn (codprod, codforn, valor_custo)
-      VALUES (${codprod}, ${codforn}, ${valor_custo || 0})
+      INSERT INTO sistema_nfe.produto_forn (codprod, codforn)
+      VALUES (${codprod}, ${codforn})
       RETURNING *
     `;
 
@@ -142,50 +141,6 @@ export async function DELETE(request: Request) {
     console.error('Erro ao excluir relacionamento produto-fornecedor:', error);
     return NextResponse.json(
       { error: 'Erro ao excluir relacionamento produto-fornecedor' },
-      { status: 500 }
-    );
-  }
-}
-
-// PUT - Atualizar valor_custo do relacionamento produto-fornecedor
-export async function PUT(request: Request) {
-  try {
-    const { codprod, codforn, valor_custo } = await request.json();
-
-    if (!codprod || !codforn) {
-      return NextResponse.json(
-        { error: 'Código do produto e código do fornecedor são obrigatórios' },
-        { status: 400 }
-      );
-    }
-
-    // Verificar se o relacionamento existe
-    const relacionamentoExiste = await sql`
-      SELECT 1 
-      FROM sistema_nfe.produto_forn 
-      WHERE codprod = ${codprod} AND codforn = ${codforn}
-    `;
-
-    if (relacionamentoExiste.length === 0) {
-      return NextResponse.json(
-        { error: 'Relacionamento produto-fornecedor não encontrado' },
-        { status: 404 }
-      );
-    }
-
-    // Atualizar o valor_custo
-    const relacionamentoAtualizado = await sql`
-      UPDATE sistema_nfe.produto_forn
-      SET valor_custo = ${valor_custo || 0}
-      WHERE codprod = ${codprod} AND codforn = ${codforn}
-      RETURNING *
-    `;
-
-    return NextResponse.json(relacionamentoAtualizado[0]);
-  } catch (error) {
-    console.error('Erro ao atualizar relacionamento produto-fornecedor:', error);
-    return NextResponse.json(
-      { error: 'Erro ao atualizar relacionamento produto-fornecedor' },
       { status: 500 }
     );
   }

@@ -20,8 +20,13 @@ export function Sidebar() {
         { name: 'Clientes', href: '/clientes' },
         { name: 'Fornecedores', href: '/fornecedores' },
         { name: 'Funcionários', href: '/funcionarios' },
+        { name: 'Funções de Funcionário', href: '/funcoes-funcionario' },
         { name: 'Produtos', href: '/produtos' },
+        { name: 'Categorias', href: '/categorias' },
+        { name: 'Marcas', href: '/marcas' },
+        { name: 'Unidades de Medida', href: '/unidades-medida' },
         { name: 'Transportadoras', href: '/transportadoras' },
+        { name: 'Veículos', href: '/veiculos' },
       ]
     },
     {

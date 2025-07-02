@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { PlusIcon, PencilIcon, TrashIcon, ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/outline';
-import { Modal } from '@/components/Modal';
+import { PlusIcon, PencilIcon, TrashIcon, MagnifyingGlassIcon, EyeIcon } from '@heroicons/react/24/outline';
+
 import { DataTable } from '@/components/DataTable';
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,6 +21,7 @@ import CondicaoPagamentoSelect from '@/components/forms/CondicaoPagamentoSelect'
 
 interface Cliente {
   codcli: number;
+  codpessoa: number;
   tipopessoa: 'F' | 'J';
   nomerazao: string;
   nomefantasia: string;
@@ -40,17 +41,20 @@ interface Cliente {
   nomepais?: string;
   codcondpgto: number;
   condicao_pagamento: string;
+  data_criacao?: string;
+  data_alteracao?: string;
+  situacao?: boolean;
 }
 
 export default function ClientesPage() {
   const [clientes, setClientes] = useState<Cliente[]>([]);
-  const [expandedRows, setExpandedRows] = useState<number[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null);
   const [selectedCidade, setSelectedCidade] = useState<{ codcid: number; nomecidade: string; nomeestado: string; nomepais?: string } | null>(null);
   const [selectedCondicaoPagamento, setSelectedCondicaoPagamento] = useState<{ codcondpgto: number; descricao: string } | null>(null);
-  const [formData, setFormData] = useState<Omit<Cliente, 'datacadastro' | 'codcli'>>({
+  const [formData, setFormData] = useState<Omit<Cliente, 'datacadastro' | 'codcli' | 'codpessoa'>>({
     tipopessoa: 'F',
     nomerazao: '',
     nomefantasia: '',
@@ -65,16 +69,97 @@ export default function ClientesPage() {
     telefone: '',
     email: '',
     codcondpgto: 0,
-    condicao_pagamento: ''
+    condicao_pagamento: '',
+    situacao: undefined,
   });
   const [sortConfig, setSortConfig] = useState<{
     key: keyof Cliente;
     direction: 'asc' | 'desc';
   }>({ key: 'nomerazao', direction: 'asc' });
+  
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isSearchingCPF, setIsSearchingCPF] = useState(false);
+  const [cpfSearched, setCpfSearched] = useState(false);
+  const [cpfFound, setCpfFound] = useState(false);
 
   useEffect(() => {
     fetchClientes();
   }, []);
+
+  // useEffect para buscar pessoa por CPF/CNPJ
+  useEffect(() => {
+    if (formData.cpfcnpj && formData.cpfcnpj.replace(/\D/g, '').length >= 11 && !selectedCliente) {
+      const timer = setTimeout(() => {
+        searchPersonByCPF(formData.cpfcnpj);
+      }, 500);
+      return () => clearTimeout(timer);
+    } else {
+      // Reset states when CPF is cleared or too short
+      setIsSearchingCPF(false);
+      setCpfSearched(false);
+      setCpfFound(false);
+    }
+  }, [formData.cpfcnpj, selectedCliente]);
+
+  const searchPersonByCPF = async (cpfcnpj: string) => {
+    const cleanCPF = cpfcnpj.replace(/\D/g, '');
+    if (cleanCPF.length < 11) return;
+
+    setIsSearchingCPF(true);
+    setCpfSearched(false);
+    setCpfFound(false);
+
+    try {
+      const response = await fetch(`/api/clientes?cpfcnpj=${cleanCPF}`);
+      const data = await response.json();
+
+      if (data.exists && data.data) {
+        console.log('Pessoa encontrada:', data.data);
+        const pessoa = data.data;
+        
+        // Preencher automaticamente os dados
+        setFormData(prev => ({
+          ...prev,
+          codpessoa: pessoa.codigo,
+          tipopessoa: pessoa.tipopessoa,
+          nomerazao: pessoa.nomerazao || '',
+          nomefantasia: pessoa.nomefantasia || '',
+          cpfcnpj: formatCPFCNPJ(pessoa.cpfcnpj || ''),
+          rg_inscricaoestadual: pessoa.rg_inscricaoestadual || '',
+          endereco: pessoa.endereco || '',
+          numero: pessoa.numero || '',
+          complemento: pessoa.complemento || '',
+          bairro: pessoa.bairro || '',
+          cep: pessoa.cep || '',
+          codcid: pessoa.codcid || 0,
+          telefone: pessoa.telefone || '',
+          email: pessoa.email || ''
+        }));
+
+        // Configurar cidade se existir
+        if (pessoa.codcid) {
+          setSelectedCidade({
+            codcid: pessoa.codcid,
+            nomecidade: pessoa.nomecidade || '',
+            nomeestado: pessoa.nomeestado || '',
+            nomepais: pessoa.nomepais || ''
+          });
+        }
+
+        setCpfFound(true);
+        toast.success('Dados encontrados e preenchidos automaticamente!');
+      } else {
+        console.log('Pessoa não encontrada');
+        setCpfFound(false);
+      }
+    } catch (error) {
+      console.error('Erro ao buscar pessoa:', error);
+      setCpfFound(false);
+    } finally {
+      setIsSearchingCPF(false);
+      setCpfSearched(true);
+    }
+  };
 
   const fetchClientes = async () => {
     try {
@@ -108,6 +193,8 @@ export default function ClientesPage() {
         descricao: cliente.condicao_pagamento
       });
       setFormData({
+        codcli: cliente.codcli,
+        codpessoa: cliente.codpessoa,
         tipopessoa: cliente.tipopessoa,
         nomerazao: cliente.nomerazao,
         nomefantasia: cliente.nomefantasia,
@@ -123,12 +210,15 @@ export default function ClientesPage() {
         email: cliente.email,
         codcondpgto: cliente.codcondpgto,
         condicao_pagamento: cliente.condicao_pagamento,
+        situacao: cliente.situacao,
       });
     } else {
       setSelectedCliente(null);
       setSelectedCidade(null);
       setSelectedCondicaoPagamento(null);
       setFormData({
+        codcli: 0,
+        codpessoa: 0,
         tipopessoa: 'F',
         nomerazao: '',
         nomefantasia: '',
@@ -144,8 +234,15 @@ export default function ClientesPage() {
         email: '',
         codcondpgto: 0,
         condicao_pagamento: '',
+        situacao: undefined,
       });
     }
+    
+    // Reset search states when opening modal
+    setIsSearchingCPF(false);
+    setCpfSearched(false);
+    setCpfFound(false);
+    
     setIsModalOpen(true);
   };
 
@@ -162,6 +259,29 @@ export default function ClientesPage() {
   const handleCloseDeleteModal = () => {
     setIsDeleteModalOpen(false);
     setSelectedCliente(null);
+  };
+
+  const handleOpenDetailsModal = (cliente: Cliente) => {
+    setSelectedCliente(cliente);
+    setIsDetailsModalOpen(true);
+  };
+
+  const handleCloseDetailsModal = () => {
+    setIsDetailsModalOpen(false);
+    setSelectedCliente(null);
+  };
+
+  const formatDateTime = (dateString: string) => {
+    if (!dateString) return '-';
+    
+    const date = new Date(dateString);
+    return date.toLocaleString('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   };
 
   const formatCPFCNPJ = (value: string) => {
@@ -186,6 +306,17 @@ export default function ClientesPage() {
     }
   };
 
+  const handleCPFChange = (value: string) => {
+    const formattedValue = formatCPFCNPJ(value);
+    setFormData({ ...formData, cpfcnpj: formattedValue });
+    
+    // Reset search states when CPF changes
+    if (cpfSearched) {
+      setCpfSearched(false);
+      setCpfFound(false);
+    }
+  };
+
   const validateCPFCNPJ = (cpfcnpj: string) => {
     const numbers = cpfcnpj.replace(/\D/g, '');
     
@@ -195,9 +326,59 @@ export default function ClientesPage() {
     }
     
     if (formData.tipopessoa === 'F') {
-      return numbers.length === 11;
+      // Validação de CPF
+      if (numbers.length !== 11) return false;
+      
+      // Verifica se todos os dígitos são iguais
+      if (/^(\d)\1{10}$/.test(numbers)) return false;
+      
+      // Validação do primeiro dígito verificador
+      let soma = 0;
+      for (let i = 0; i < 9; i++) {
+        soma += parseInt(numbers.charAt(i)) * (10 - i);
+      }
+      let resto = 11 - (soma % 11);
+      let digito1 = resto > 9 ? 0 : resto;
+      
+      // Validação do segundo dígito verificador
+      soma = 0;
+      for (let i = 0; i < 10; i++) {
+        soma += parseInt(numbers.charAt(i)) * (11 - i);
+      }
+      resto = 11 - (soma % 11);
+      let digito2 = resto > 9 ? 0 : resto;
+      
+      // Verifica se os dígitos verificadores estão corretos
+      return digito1 === parseInt(numbers.charAt(9)) && digito2 === parseInt(numbers.charAt(10));
     } else {
-      return numbers.length === 14;
+      // Validação de CNPJ
+      if (numbers.length !== 14) return false;
+      
+      // Verifica se todos os dígitos são iguais
+      if (/^(\d)\1{13}$/.test(numbers)) return false;
+      
+      // Validação do primeiro dígito verificador
+      let soma = 0;
+      let peso = 5;
+      for (let i = 0; i < 12; i++) {
+        soma += parseInt(numbers.charAt(i)) * peso;
+        peso = peso === 2 ? 9 : peso - 1;
+      }
+      let resto = soma % 11;
+      let digito1 = resto < 2 ? 0 : 11 - resto;
+      
+      // Validação do segundo dígito verificador
+      soma = 0;
+      peso = 6;
+      for (let i = 0; i < 13; i++) {
+        soma += parseInt(numbers.charAt(i)) * peso;
+        peso = peso === 2 ? 9 : peso - 1;
+      }
+      resto = soma % 11;
+      let digito2 = resto < 2 ? 0 : 11 - resto;
+      
+      // Verifica se os dígitos verificadores estão corretos
+      return digito1 === parseInt(numbers.charAt(12)) && digito2 === parseInt(numbers.charAt(13));
     }
   };
 
@@ -207,6 +388,12 @@ export default function ClientesPage() {
     // Se não selecionou cidade, mostra erro
     if (!selectedCidade) {
       toast.error('Por favor, selecione uma cidade');
+      return;
+    }
+
+    // Validar condição de pagamento
+    if (!selectedCondicaoPagamento) {
+      toast.error('Por favor, selecione uma condição de pagamento');
       return;
     }
 
@@ -231,7 +418,7 @@ export default function ClientesPage() {
 
       let response;
       if (selectedCliente) {
-        // Se estiver editando, inclui o codcli
+        // Se estiver editando, inclui o codcli e codpessoa
         response = await fetch('/api/clientes', {
           method: 'PUT',
           headers: {
@@ -239,7 +426,8 @@ export default function ClientesPage() {
           },
           body: JSON.stringify({
             ...dataToSend,
-            codcli: selectedCliente.codcli
+            codcli: selectedCliente.codcli,
+            codpessoa: selectedCliente.codpessoa
           }),
         });
       } else {
@@ -271,7 +459,7 @@ export default function ClientesPage() {
     if (!selectedCliente) return;
 
     try {
-      const response = await fetch(`/api/clientes?codcli=${selectedCliente.codcli}`, {
+      const response = await fetch(`/api/clientes?codcli=${selectedCliente.codcli}&codpessoa=${selectedCliente.codpessoa}`, {
         method: 'DELETE',
       });
 
@@ -302,369 +490,623 @@ export default function ClientesPage() {
     }));
   };
 
-  const toggleRowExpansion = (codcli: number, e: React.MouseEvent) => {
-    if (e) {
-      e.stopPropagation();
-    }
-    setExpandedRows(prev => 
-      prev.includes(codcli) 
-        ? prev.filter(id => id !== codcli) 
-        : [...prev, codcli]
-    );
-    console.log("Toggling row:", codcli, "Current expanded rows:", expandedRows);
-  };
-
   const columns = [
-    { key: 'codcli', label: 'Código', className: 'w-16' },
-    { key: 'nomerazao', label: 'Nome/Razão Social', className: 'max-w-[200px]' },
-    { key: 'nomefantasia', label: 'Apelido/Nome Fantasia', className: 'max-w-[200px]' },
-    { key: 'cpfcnpj', label: 'CPF/CNPJ', className: 'w-32' },
-    { key: 'telefone', label: 'Telefone', className: 'w-32' },
-    { key: 'email', label: 'E-mail', className: 'max-w-[200px]' },
-    { key: 'condicao_pagamento', label: 'Condição de Pagamento', className: 'max-w-[200px]' }
+    { 
+      key: 'codcli', 
+      label: 'Código'
+    },
+    { 
+      key: 'nomerazao', 
+      label: 'Nome/Razão Social'
+    },
+    { 
+      key: 'nomefantasia', 
+      label: 'Apelido/Nome Fantasia'
+    },
+    { 
+      key: 'nomecidade', 
+      label: 'Cidade',
+      render: (cliente: Cliente) => (
+        <span className="text-xs sm:text-sm text-gray-900 truncate">
+          {cliente.nomecidade && cliente.nomeestado 
+            ? `${cliente.nomecidade}/${cliente.nomeestado}`
+            : '-'
+          }
+        </span>
+      )
+    },
+    { 
+      key: 'telefone', 
+      label: 'Telefone',
+      render: (item: Cliente) => (
+        <span className="text-xs sm:text-sm text-gray-900 font-mono">
+          {item.telefone || '-'}
+        </span>
+      )
+    },
+    { 
+      key: 'condicao_pagamento', 
+      label: 'Condição Pagamento',
+      render: (item: Cliente) => (
+        <span className="text-xs sm:text-sm text-gray-900 truncate">
+          {item.condicao_pagamento || '-'}
+        </span>
+      )
+    },
+    {
+      key: 'situacao',
+      label: 'Status',
+      render: (item: Cliente) => (
+        <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium ${
+          item.situacao ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
+        }`}>
+          <span className="hidden sm:inline">{item.situacao ? '🔴 Inativo' : '🟢 Ativo'}</span>
+          <span className="sm:hidden">{item.situacao ? '🔴' : '🟢'}</span>
+        </span>
+      )
+    }
   ];
 
-  const sortedClientes = [...clientes].sort((a, b) => {
-    if (sortConfig.key === 'nomerazao') {
-      return sortConfig.direction === 'asc'
-        ? a.nomerazao.localeCompare(b.nomerazao)
-        : b.nomerazao.localeCompare(a.nomerazao);
-    }
-    return 0;
-  });
+  const filteredAndSortedClientes = clientes
+    .filter(cliente => 
+      cliente.codcli.toString().toLowerCase().includes(searchTerm.toLowerCase()) ||
+      cliente.nomerazao.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      cliente.nomefantasia.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      cliente.nomecidade?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      cliente.nomeestado?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      cliente.telefone.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      cliente.condicao_pagamento.toLowerCase().includes(searchTerm.toLowerCase())
+    )
+    .sort((a, b) => {
+      const aValue = String(a[sortConfig.key] || '');
+      const bValue = String(b[sortConfig.key] || '');
+      return sortConfig.direction === 'asc' 
+        ? aValue.localeCompare(bValue)
+        : bValue.localeCompare(aValue);
+    });
 
   return (
-    <div className="container mx-auto py-6 max-w-[1200px]">
-      <div className="flex justify-between items-center mb-4">
-        <h1 className="text-2xl font-bold">Clientes</h1>
-        <Button
-          onClick={() => handleOpenModal()}
-          className="bg-violet-600 hover:bg-violet-500"
-        >
-          <PlusIcon className="h-5 w-5 mr-2" />
-          Novo Cliente
-        </Button>
+    <div className="px-4 sm:px-6 lg:px-8">
+      <div className="sm:flex sm:items-center">
+        <div className="sm:flex-auto">
+          <h1 className="text-base font-semibold leading-6 text-gray-900">Clientes</h1>
+          <p className="mt-2 text-sm text-gray-700">
+            Lista de todos os clientes cadastrados no sistema.
+          </p>
+        </div>
+        <div className="mt-4 sm:ml-16 sm:mt-0 sm:flex-none flex items-center gap-3">
+          <div className="relative">
+            <Input
+              type="text"
+              placeholder="Buscar cliente..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-[320px] pl-10"
+            />
+            <MagnifyingGlassIcon className="h-5 w-5 absolute left-3 top-2.5 text-gray-400" />
+          </div>
+          <Button
+            onClick={() => handleOpenModal()}
+            className="bg-violet-600 hover:bg-violet-500"
+          >
+            <PlusIcon className="h-5 w-5 mr-2" />
+            Novo Cliente
+          </Button>
+        </div>
       </div>
 
-      <div className="bg-white rounded-lg shadow overflow-hidden">
+      <div className="mt-6">
         <DataTable
-          data={sortedClientes}
+          data={filteredAndSortedClientes}
           columns={columns}
-          onSort={handleSort}
-          expandedRows={expandedRows}
-          expandedContent={(item: Cliente) => (
-            <div className="p-4 bg-gray-50">
-              <div className="text-sm">
-                <p><span className="font-medium">Endereço:</span> {item.endereco}, {item.numero}</p>
-                <p><span className="font-medium">Complemento:</span> {item.complemento || '-'}</p>
-                <p><span className="font-medium">Bairro:</span> {item.bairro}</p>
-                <p><span className="font-medium">Cidade:</span> {item.nomecidade} - {item.nomeestado}</p>
-                <p><span className="font-medium">País:</span> {item.nomepais}</p>
-                <p><span className="font-medium">CEP:</span> {item.cep}</p>
-              </div>
-            </div>
-          )}
-          sortKey={sortConfig.key}
-          sortDirection={sortConfig.direction}
           actions={[
             {
-              icon: (item) => {
-                const isExpanded = expandedRows.includes(item.codcli);
-                return isExpanded ? 
-                  <ChevronUpIcon className="h-5 w-5" /> : 
-                  <ChevronDownIcon className="h-5 w-5" />;
-              },
-              onClick: (item: Cliente, e: React.MouseEvent) => toggleRowExpansion(item.codcli, e as any),
-              label: 'Expandir',
-            },
-            {
-              icon: PencilIcon,
-              onClick: (item: Cliente) => handleOpenModal(item),
-              label: 'Editar',
-            },
-            {
-              icon: (props) => <TrashIcon {...props} className="h-5 w-5 text-red-600 hover:text-red-900" />,
-              onClick: (item: Cliente) => handleOpenDeleteModal(item),
-              label: 'Excluir',
-            },
+              icon: EyeIcon,
+              onClick: handleOpenDetailsModal,
+              label: 'Ver Detalhes'
+            }
           ]}
+          onEdit={handleOpenModal}
+          onDelete={handleOpenDeleteModal}
         />
       </div>
 
-      <Modal isOpen={isModalOpen} onClose={handleCloseModal} title={selectedCliente ? 'Editar Cliente' : 'Novo Cliente'}>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="tipopessoa" className="block text-sm font-medium text-gray-700">
-                Tipo de Pessoa
-              </label>
-              <select
-                id="tipopessoa"
-                value={formData.tipopessoa}
-                onChange={(e) => setFormData({ ...formData, tipopessoa: e.target.value as 'F' | 'J' })}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                required
-              >
-                <option value="F">Física</option>
-                <option value="J">Jurídica</option>
-              </select>
+      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{selectedCliente ? 'Editar Cliente' : 'Novo Cliente'}</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Primeira linha: Código, Tipo de Pessoa e Status */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <Label htmlFor="codcli">Código</Label>
+                  <Input
+                    id="codcli"
+                  value={selectedCliente ? formData.codcli : ''}
+                    disabled
+                    className="bg-gray-50"
+                  placeholder={selectedCliente ? '' : 'Auto'}
+                  />
+                </div>
+              <div>
+                <Label htmlFor="tipopessoa">Tipo de Pessoa</Label>
+                <select
+                  id="tipopessoa"
+                  value={formData.tipopessoa}
+                  onChange={(e) => setFormData({ ...formData, tipopessoa: e.target.value as 'F' | 'J' })}
+                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                  required
+                >
+                  <option value="F">Física</option>
+                  <option value="J">Jurídica</option>
+                </select>
+              </div>
+              <div>
+                <Label htmlFor="situacao">Status</Label>
+                <select
+                  id="situacao"
+                  value={formData.situacao ? 'inativo' : 'ativo'}
+                  onChange={(e) => {
+                    const isAtivo = e.target.value === 'ativo';
+                    setFormData({ ...formData, situacao: isAtivo ? undefined : true });
+                  }}
+                  disabled={!selectedCliente}
+                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <option value="ativo">🟢 Ativo</option>
+                  <option value="inativo">🔴 Inativo</option>
+                </select>
+              </div>
             </div>
-          </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="nomerazao" className="block text-sm font-medium text-gray-700">
-                {formData.tipopessoa === 'F' ? 'Cliente' : 'Razão Social'}
-              </label>
-              <input
-                type="text"
-                id="nomerazao"
-                value={formData.nomerazao}
-                onChange={(e) => setFormData({ ...formData, nomerazao: e.target.value })}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                required
-              />
-            </div>
-            <div>
-              <label htmlFor="nomefantasia" className="block text-sm font-medium text-gray-700">
-                {formData.tipopessoa === 'F' ? 'Apelido' : 'Nome Fantasia'}
-              </label>
-              <input
-                type="text"
-                id="nomefantasia"
-                value={formData.nomefantasia}
-                onChange={(e) => setFormData({ ...formData, nomefantasia: e.target.value })}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label>Cidade</Label>
-              <CidadeSelect
-                value={selectedCidade ? {
-                  codcid: selectedCidade.codcid,
-                  nomecidade: selectedCidade.nomecidade,
-                  nomeestado: selectedCidade.nomeestado,
-                  codest: ''
-                } : null}
-                onChange={(cidade) => {
-                  if (cidade) {
-                    handleCidadeSelect({
-                      codcidade: cidade.codcid,
-                      nomecidade: cidade.nomecidade,
-                      nomeestado: cidade.nomeestado || '',
-                      nomepais: cidade.nomepais || ''
-                    });
-                  }
-                }}
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="cpfcnpj" className="block text-sm font-medium text-gray-700">
-                {formData.tipopessoa === 'F' ? 'CPF' : 'CNPJ'}
-                {selectedCidade?.nomepais?.toLowerCase() !== 'brasil' && (
-                  <span className="text-gray-500 text-xs ml-1">(opcional)</span>
+            {/* Endereço */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium text-gray-900">Endereço</h3>
+              <div>
+                <Label>Cidade *</Label>
+                <CidadeSelect
+                  value={selectedCidade ? {
+                    codcid: selectedCidade.codcid,
+                    nomecidade: selectedCidade.nomecidade,
+                    nomeestado: selectedCidade.nomeestado,
+                    codest: ''
+                  } : null}
+                  onChange={(cidade) => {
+                    if (cidade) {
+                      handleCidadeSelect({
+                        codcidade: cidade.codcid,
+                        nomecidade: cidade.nomecidade,
+                        nomeestado: cidade.nomeestado || '',
+                        nomepais: cidade.nomepais || ''
+                      });
+                    }
+                  }}
+                />
+                {selectedCidade?.nomepais?.toLowerCase() === 'brasil' && (
+                  <p className="text-xs text-amber-600 mt-1">
+                    ⚠️ {formData.tipopessoa === 'F' ? 'CPF' : 'CNPJ'} obrigatório para pessoas no Brasil
+                  </p>
                 )}
-              </label>
-              <input
-                type="text"
-                id="cpfcnpj"
-                value={formData.cpfcnpj}
-                onChange={(e) => setFormData({ ...formData, cpfcnpj: formatCPFCNPJ(e.target.value) })}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                required={selectedCidade?.nomepais?.toLowerCase() === 'brasil'}
-                maxLength={formData.tipopessoa === 'F' ? 14 : 18}
-              />
-            </div>
-            <div>
-              <label htmlFor="rg_inscricaoestadual" className="block text-sm font-medium text-gray-700">
-                {formData.tipopessoa === 'F' ? 'RG' : 'Inscrição Estadual'}
-              </label>
-              <input
-                type="text"
-                id="rg_inscricaoestadual"
-                value={formData.rg_inscricaoestadual}
-                onChange={(e) => setFormData({ ...formData, rg_inscricaoestadual: e.target.value })}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-              />
-            </div>
-          </div>
+              </div>
 
-          <div className="grid grid-cols-3 gap-4">
-            <div className="col-span-2">
-              <label htmlFor="endereco" className="block text-sm font-medium text-gray-700">
-                Endereço
-              </label>
-              <input
-                type="text"
-                id="endereco"
-                value={formData.endereco}
-                onChange={(e) => setFormData({ ...formData, endereco: e.target.value })}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                required
-              />
-            </div>
-            <div>
-              <label htmlFor="numero" className="block text-sm font-medium text-gray-700">
-                Número
-              </label>
-              <input
-                type="text"
-                id="numero"
-                value={formData.numero}
-                onChange={(e) => setFormData({ ...formData, numero: e.target.value })}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                required
-              />
-            </div>
-          </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="md:col-span-2">
+                  <Label htmlFor="endereco">Endereço</Label>
+                  <Input
+                    id="endereco"
+                    value={formData.endereco}
+                    onChange={(e) => setFormData({ ...formData, endereco: e.target.value })}
+                    placeholder="Rua, Avenida, etc."
+                    required
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="numero">Número</Label>
+                  <Input
+                    id="numero"
+                    value={formData.numero}
+                    onChange={(e) => setFormData({ ...formData, numero: e.target.value })}
+                    placeholder="123"
+                    required
+                  />
+                </div>
+              </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="complemento" className="block text-sm font-medium text-gray-700">
-                Complemento
-              </label>
-              <input
-                type="text"
-                id="complemento"
-                value={formData.complemento}
-                onChange={(e) => setFormData({ ...formData, complemento: e.target.value })}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-              />
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <Label htmlFor="complemento">Complemento</Label>
+                  <Input
+                    id="complemento"
+                    value={formData.complemento}
+                    onChange={(e) => setFormData({ ...formData, complemento: e.target.value })}
+                    placeholder="Apto, Sala, etc."
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="bairro">Bairro</Label>
+                  <Input
+                    id="bairro"
+                    value={formData.bairro}
+                    onChange={(e) => setFormData({ ...formData, bairro: e.target.value })}
+                    placeholder="Nome do bairro"
+                    required
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="cep">CEP</Label>
+                  <Input
+                    id="cep"
+                    value={formData.cep}
+                    onChange={(e) => setFormData({ ...formData, cep: e.target.value })}
+                    placeholder="CEP / Código Postal"
+                    required
+                  />
+                </div>
+              </div>
             </div>
-            <div>
-              <label htmlFor="bairro" className="block text-sm font-medium text-gray-700">
-                Bairro
-              </label>
-              <input
-                type="text"
-                id="bairro"
-                value={formData.bairro}
-                onChange={(e) => setFormData({ ...formData, bairro: e.target.value })}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                required
-              />
-            </div>
-          </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="cep" className="block text-sm font-medium text-gray-700">
-                CEP
-              </label>
-              <input
-                type="text"
-                id="cep"
-                value={formData.cep}
-                onChange={(e) => setFormData({ ...formData, cep: e.target.value })}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                required
-              />
-            </div>
-          </div>
+            {/* Dados Pessoais */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium text-gray-900">Dados Pessoais</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="nomerazao">
+                    {formData.tipopessoa === 'F' ? 'Nome' : 'Razão Social'} *
+                  </Label>
+                  <Input
+                    id="nomerazao"
+                    value={formData.nomerazao}
+                    onChange={(e) => setFormData({ ...formData, nomerazao: e.target.value })}
+                    placeholder={formData.tipopessoa === 'F' ? 'Digite o nome' : 'Digite a razão social'}
+                    required
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="nomefantasia">
+                    {formData.tipopessoa === 'F' ? 'Apelido' : 'Nome Fantasia'}
+                  </Label>
+                  <Input
+                    id="nomefantasia"
+                    value={formData.nomefantasia}
+                    onChange={(e) => setFormData({ ...formData, nomefantasia: e.target.value })}
+                    placeholder={formData.tipopessoa === 'F' ? 'Digite o apelido' : 'Digite o nome fantasia'}
+                  />
+                </div>
+              </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="telefone" className="block text-sm font-medium text-gray-700">
-                Telefone
-              </label>
-              <input
-                type="tel"
-                id="telefone"
-                value={formData.telefone}
-                onChange={(e) => setFormData({ ...formData, telefone: e.target.value })}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                required
-              />
-            </div>
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                Email
-              </label>
-              <input
-                type="email"
-                id="email"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-              />
-            </div>
-          </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="cpfcnpj">
+                    {formData.tipopessoa === 'F' ? 'CPF' : 'CNPJ'}
+                    {selectedCidade?.nomepais?.toLowerCase() === 'brasil' && ' *'}
+                    {isSearchingCPF && <span className="text-blue-500 text-xs ml-2">Buscando...</span>}
+                    {cpfSearched && !isSearchingCPF && !selectedCliente && (
+                      <span className="text-green-500 text-xs ml-2">✓ Verificado</span>
+                    )}
+                  </Label>
+                  <div className="relative">
+                    <Input
+                      id="cpfcnpj"
+                      value={formData.cpfcnpj}
+                      onChange={(e) => handleCPFChange(e.target.value)}
+                      placeholder={formData.tipopessoa === 'F' ? '000.000.000-00' : '00.000.000/0000-00'}
+                      maxLength={formData.tipopessoa === 'F' ? 14 : 18}
+                      className={isSearchingCPF ? 'pr-8' : ''}
+                      required={selectedCidade?.nomepais?.toLowerCase() === 'brasil'}
+                    />
+                    {isSearchingCPF && (
+                      <div className="absolute right-2 top-2">
+                        <div className="animate-spin h-4 w-4 border-2 border-blue-500 border-t-transparent rounded-full"></div>
+                      </div>
+                    )}
+                  </div>
+                  {!selectedCliente && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      {isSearchingCPF ? (
+                        <span className="text-blue-600">🔍 Buscando {formData.tipopessoa === 'F' ? 'CPF' : 'CNPJ'}...</span>
+                      ) : cpfSearched && cpfFound ? (
+                        <span className="text-green-600">✅ {formData.tipopessoa === 'F' ? 'CPF' : 'CNPJ'} encontrado! Dados preenchidos automaticamente</span>
+                      ) : cpfSearched && !cpfFound ? (
+                        <span className="text-orange-600">ℹ️ {formData.tipopessoa === 'F' ? 'CPF' : 'CNPJ'} não encontrado. Novos dados serão criados</span>
+                      ) : (
+                        <span>💡 Se o {formData.tipopessoa === 'F' ? 'CPF' : 'CNPJ'} já estiver cadastrado, seus dados serão preenchidos automaticamente</span>
+                      )}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <Label htmlFor="rg_inscricaoestadual">
+                    {formData.tipopessoa === 'F' ? 'RG' : 'Inscrição Estadual'}
+                  </Label>
+                  <Input
+                    id="rg_inscricaoestadual"
+                    value={formData.rg_inscricaoestadual}
+                    onChange={(e) => setFormData({ ...formData, rg_inscricaoestadual: e.target.value })}
+                    placeholder={formData.tipopessoa === 'F' ? 'Digite o RG' : 'Digite a inscrição estadual'}
+                  />
+                </div>
+              </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label>Condição de Pagamento</Label>
-              <CondicaoPagamentoSelect
-                value={selectedCondicaoPagamento ? {
-                  codcondpgto: selectedCondicaoPagamento.codcondpgto,
-                  descricao: selectedCondicaoPagamento.descricao,
-                  juros_perc: 0,
-                  multa_perc: 0,
-                  desconto_perc: 0,
-                  parcelas: []
-                } : null}
-                onChange={(condicao) => {
-                  if (condicao) {
-                    setSelectedCondicaoPagamento({
-                      codcondpgto: condicao.codcondpgto,
-                      descricao: condicao.descricao
-                    });
-                    setFormData(prev => ({
-                      ...prev,
-                      codcondpgto: condicao.codcondpgto,
-                      condicao_pagamento: condicao.descricao
-                    }));
-                  }
-                }}
-              />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="telefone">Telefone</Label>
+                  <Input
+                    id="telefone"
+                    value={formData.telefone}
+                    onChange={(e) => setFormData({ ...formData, telefone: e.target.value })}
+                    placeholder="(00) 00000-0000"
+                    required
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="email">E-mail</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    placeholder="email@exemplo.com"
+                  />
+                </div>
+              </div>
             </div>
-          </div>
 
-          <div className="flex justify-end space-x-3">
-            <button
-              type="button"
-              onClick={handleCloseModal}
-              className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            {/* Dados Comerciais */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium text-gray-900">Dados Comerciais</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label>Condição de Pagamento *</Label>
+                  <CondicaoPagamentoSelect
+                    value={selectedCondicaoPagamento ? {
+                      codcondpgto: selectedCondicaoPagamento.codcondpgto,
+                      descricao: selectedCondicaoPagamento.descricao,
+                      juros_perc: 0,
+                      multa_perc: 0,
+                      desconto_perc: 0,
+                      parcelas: []
+                    } : null}
+                    onChange={(condicao) => {
+                      if (condicao) {
+                        setSelectedCondicaoPagamento({
+                          codcondpgto: condicao.codcondpgto,
+                          descricao: condicao.descricao
+                        });
+                        setFormData(prev => ({
+                          ...prev,
+                          codcondpgto: condicao.codcondpgto,
+                          condicao_pagamento: condicao.descricao
+                        }));
+                      }
+                    }}
+                    error={!selectedCondicaoPagamento ? 'Condição de pagamento é obrigatória' : undefined}
+                    onCondicaoCreated={() => {
+                      // Callback para quando uma nova condição for criada
+                      // O componente interno já atualiza sua própria lista
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={handleCloseModal}>
+                Cancelar
+              </Button>
+              <Button type="submit">
+                Salvar
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de Detalhes */}
+      <Dialog open={isDetailsModalOpen} onOpenChange={setIsDetailsModalOpen}>
+        <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-semibold text-gray-900 flex items-center gap-2">
+              <EyeIcon className="h-5 w-5 text-violet-600" />
+              Detalhes do Cliente
+            </DialogTitle>
+          </DialogHeader>
+          
+          {selectedCliente && (
+            <div className="space-y-8">
+              {/* Identificação */}
+              <div>
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="w-1 h-6 bg-violet-600 rounded-full"></div>
+                  <h3 className="text-lg font-semibold text-gray-900">Identificação</h3>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
+                  <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                    <span className="text-sm font-medium text-gray-600">Código:</span>
+                    <span className="text-sm font-mono text-gray-900 bg-gray-50 px-2 py-1 rounded">{selectedCliente.codcli}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                    <span className="text-sm font-medium text-gray-600">Status:</span>
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                      selectedCliente.situacao ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
+                    }`}>
+                      {selectedCliente.situacao ? '🔴 Inativo' : '🟢 Ativo'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                    <span className="text-sm font-medium text-gray-600">Tipo de Pessoa:</span>
+                    <span className="text-sm text-gray-900">
+                      {selectedCliente.tipopessoa === 'F' ? 'Pessoa Física' : 'Pessoa Jurídica'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                    <span className="text-sm font-medium text-gray-600">
+                      {selectedCliente.tipopessoa === 'F' ? 'Nome:' : 'Razão Social:'}
+                    </span>
+                    <span className="text-sm font-semibold text-gray-900 text-right max-w-[200px]">{selectedCliente.nomerazao}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                    <span className="text-sm font-medium text-gray-600">
+                      {selectedCliente.tipopessoa === 'F' ? 'Apelido:' : 'Nome Fantasia:'}
+                    </span>
+                    <span className="text-sm text-gray-900 text-right max-w-[200px]">{selectedCliente.nomefantasia || '-'}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                    <span className="text-sm font-medium text-gray-600">
+                      {selectedCliente.tipopessoa === 'F' ? 'CPF:' : 'CNPJ:'}
+                    </span>
+                    <span className="text-sm font-mono text-gray-900 bg-gray-50 px-2 py-1 rounded">{selectedCliente.cpfcnpj}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                    <span className="text-sm font-medium text-gray-600">
+                      {selectedCliente.tipopessoa === 'F' ? 'RG:' : 'Inscrição Estadual:'}
+                    </span>
+                    <span className="text-sm text-gray-900">{selectedCliente.rg_inscricaoestadual || '-'}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Endereço */}
+              <div>
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="w-1 h-6 bg-blue-600 rounded-full"></div>
+                  <h3 className="text-lg font-semibold text-gray-900">Endereço</h3>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
+                  <div className="md:col-span-2 flex justify-between items-center py-2 border-b border-gray-100">
+                    <span className="text-sm font-medium text-gray-600">Endereço Completo:</span>
+                    <span className="text-sm text-gray-900 text-right max-w-[300px]">
+                      {selectedCliente.endereco}, {selectedCliente.numero}
+                      {selectedCliente.complemento && `, ${selectedCliente.complemento}`}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                    <span className="text-sm font-medium text-gray-600">Bairro:</span>
+                    <span className="text-sm text-gray-900">{selectedCliente.bairro}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                    <span className="text-sm font-medium text-gray-600">CEP:</span>
+                    <span className="text-sm font-mono text-gray-900 bg-gray-50 px-2 py-1 rounded">{selectedCliente.cep}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                    <span className="text-sm font-medium text-gray-600">Cidade/Estado:</span>
+                    <span className="text-sm text-gray-900 text-right">
+                      {selectedCliente.nomecidade}/{selectedCliente.nomeestado}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                    <span className="text-sm font-medium text-gray-600">País:</span>
+                    <span className="text-sm text-gray-900">{selectedCliente.nomepais}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Contato e Dados Comerciais */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                {/* Contato */}
+                <div>
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="w-1 h-6 bg-green-600 rounded-full"></div>
+                    <h3 className="text-lg font-semibold text-gray-900">Contato</h3>
+                  </div>
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                      <span className="text-sm font-medium text-gray-600">Telefone:</span>
+                      <span className="text-sm font-mono text-gray-900">{selectedCliente.telefone}</span>
+                    </div>
+                    <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                      <span className="text-sm font-medium text-gray-600">E-mail:</span>
+                      <span className="text-sm text-gray-900 text-right max-w-[200px]">{selectedCliente.email || '-'}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Dados Comerciais */}
+                <div>
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="w-1 h-6 bg-amber-600 rounded-full"></div>
+                    <h3 className="text-lg font-semibold text-gray-900">Dados Comerciais</h3>
+                  </div>
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                      <span className="text-sm font-medium text-gray-600">Condição de Pagamento:</span>
+                      <span className="text-sm text-gray-900 text-right max-w-[200px]">{selectedCliente.condicao_pagamento}</span>
+                    </div>
+                    {selectedCliente.situacao && (
+                      <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                        <span className="text-sm font-medium text-gray-600">Data de Desativação:</span>
+                        <span className="text-sm font-mono text-gray-900 bg-gray-50 px-2 py-1 rounded">
+                          {formatDateTime(selectedCliente.situacao.toString())}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Informações de Auditoria */}
+              <div className="pt-6 border-t border-gray-200">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="w-1 h-6 bg-gray-500 rounded-full"></div>
+                  <h3 className="text-lg font-semibold text-gray-900">Informações de Auditoria</h3>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
+                  <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                    <span className="text-sm font-medium text-gray-600">Data de Criação:</span>
+                    <span className="text-sm font-mono text-gray-900 bg-gray-50 px-2 py-1 rounded">
+                      {formatDateTime(selectedCliente.data_criacao || selectedCliente.datacadastro)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                    <span className="text-sm font-medium text-gray-600">Última Atualização:</span>
+                    <span className="text-sm font-mono text-gray-900 bg-gray-50 px-2 py-1 rounded">
+                      {formatDateTime(selectedCliente.data_alteracao || '')}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={handleCloseDetailsModal}>
+              Fechar
+            </Button>
+            <Button 
+              onClick={() => {
+                handleCloseDetailsModal();
+                handleOpenModal(selectedCliente!);
+              }}
+              className="bg-violet-600 hover:bg-violet-500"
             >
+              <PencilIcon className="h-4 w-4 mr-2" />
+              Editar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isDeleteModalOpen} onOpenChange={setIsDeleteModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirmar Exclusão</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-gray-500">
+              Tem certeza que deseja excluir o cliente "{selectedCliente?.nomerazao}"?
+              Esta ação não pode ser desfeita.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={handleCloseDeleteModal}>
               Cancelar
-            </button>
-            <button
-              type="submit"
-              className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-            >
-              Salvar
-            </button>
-          </div>
-        </form>
-      </Modal>
-
-      <Modal isOpen={isDeleteModalOpen} onClose={handleCloseDeleteModal} title="Confirmar Exclusão">
-        <div className="space-y-4">
-          <p className="text-sm text-gray-500">
-            Tem certeza que deseja excluir o cliente "{selectedCliente?.nomerazao}"?
-            Esta ação não pode ser desfeita.
-          </p>
-          <div className="flex justify-end space-x-3">
-            <button
-              onClick={handleCloseDeleteModal}
-              className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-            >
-              Cancelar
-            </button>
-            <button
-              onClick={handleDelete}
-              className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-            >
+            </Button>
+            <Button variant="destructive" onClick={handleDelete}>
               Excluir
-            </button>
-          </div>
-        </div>
-      </Modal>
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 } 

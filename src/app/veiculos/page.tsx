@@ -14,60 +14,49 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PlusIcon, MagnifyingGlassIcon, EyeIcon, PencilIcon } from '@heroicons/react/24/outline';
-import { EstadoSelect } from '@/components/forms/EstadoSelect';
 
-interface Cidade {
-  codcid: number;
-  nomecidade: string;
-  codest: number;
-  nomeestado?: string;
-  siglaest?: string;
-  nomepais?: string;
+interface Veiculo {
+  codveiculo: number;
+  placa: string;
+  modelo?: string;
+  descricao?: string;
   data_criacao?: string;
   data_alteracao?: string;
   situacao?: string;
 }
 
-interface Estado {
-  codest: number;
-  siglaest: string;
-  nomeestado: string;
-  codpais: number;
-  nomepais?: string;
-}
-
-export default function CidadesPage() {
-  const [cidades, setCidades] = useState<Cidade[]>([]);
+export default function VeiculosPage() {
+  const [veiculos, setVeiculos] = useState<Veiculo[]>([]);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
-  const [cidadeToDelete, setCidadeToDelete] = useState<Cidade | null>(null);
-  const [selectedCidade, setSelectedCidade] = useState<Cidade | null>(null);
+  const [veiculoToDelete, setVeiculoToDelete] = useState<Veiculo | null>(null);
+  const [selectedVeiculo, setSelectedVeiculo] = useState<Veiculo | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [formData, setFormData] = useState<Cidade>({
-    codcid: 0,
-    nomecidade: '',
-    codest: 0,
+  const [formData, setFormData] = useState<Veiculo>({
+    codveiculo: 0,
+    placa: '',
+    modelo: '',
+    descricao: '',
     situacao: undefined
   });
   const [isEditing, setIsEditing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [sortKey, setSortKey] = useState<keyof Cidade>('nomecidade');
+  const [sortKey, setSortKey] = useState<keyof Veiculo>('placa');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
-  const [selectedEstado, setSelectedEstado] = useState<Estado | null>(null);
 
   useEffect(() => {
-    fetchCidades();
+    fetchVeiculos();
   }, []);
 
-  const fetchCidades = async () => {
+  const fetchVeiculos = async () => {
     try {
-      const response = await fetch('/api/cidades');
-      if (!response.ok) throw new Error('Erro ao carregar cidades');
+      const response = await fetch('/api/veiculos');
+      if (!response.ok) throw new Error('Erro ao carregar veículos');
       const data = await response.json();
-      setCidades(data);
+      setVeiculos(data);
     } catch (error) {
       console.error('Erro:', error);
-      toast.error('Erro ao carregar cidades');
+      toast.error('Erro ao carregar veículos');
     }
   };
 
@@ -75,79 +64,68 @@ export default function CidadesPage() {
     e.preventDefault();
     
     // Validação básica
-    if (!formData.nomecidade.trim()) {
-      toast.error('Nome da cidade é obrigatório');
-      return;
-    }
-
-    if (!selectedEstado || !formData.codest) {
-      toast.error('Estado é obrigatório');
+    if (!formData.placa.trim()) {
+      toast.error('Placa é obrigatória');
       return;
     }
 
     try {
-      const response = await fetch('/api/cidades', {
+      const dataToSend = {
+        ...formData,
+        placa: formData.placa.toUpperCase().trim()
+      };
+
+      const response = await fetch('/api/veiculos', {
         method: isEditing ? 'PUT' : 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(dataToSend),
       });
 
       const data = await response.json();
 
       if (response.ok) {
-        await fetchCidades();
+        await fetchVeiculos();
         setIsFormOpen(false);
         setFormData({
-          codcid: 0,
-          nomecidade: '',
-          codest: 0,
+          codveiculo: 0,
+          placa: '',
+          modelo: '',
+          descricao: '',
           situacao: undefined
         });
-        setSelectedEstado(null);
         setIsEditing(false);
-        toast.success(isEditing ? 'Cidade atualizada com sucesso!' : 'Cidade cadastrada com sucesso!');
+        toast.success(isEditing ? 'Veículo atualizado com sucesso!' : 'Veículo cadastrado com sucesso!');
       } else {
-        toast.error(data.error || 'Erro ao salvar cidade');
+        toast.error(data.error || 'Erro ao salvar veículo');
       }
     } catch (error) {
       console.error('Erro:', error);
-      toast.error('Erro ao salvar cidade');
+      toast.error('Erro ao salvar veículo');
     }
   };
 
-  const handleEdit = (cidade: Cidade) => {
+  const handleEdit = (veiculo: Veiculo) => {
     setFormData({
-      codcid: cidade.codcid,
-      nomecidade: cidade.nomecidade,
-      codest: cidade.codest,
-      situacao: cidade.situacao
+      codveiculo: veiculo.codveiculo,
+      placa: veiculo.placa,
+      modelo: veiculo.modelo || '',
+      descricao: veiculo.descricao || '',
+      situacao: veiculo.situacao
     });
-    
-    // Configurar estado selecionado para o EstadoSelect
-    if (cidade.codest && cidade.nomeestado) {
-      setSelectedEstado({
-        codest: cidade.codest,
-        siglaest: cidade.siglaest || '',
-        nomeestado: cidade.nomeestado,
-        codpais: 0, // Será carregado pelo componente
-        nomepais: cidade.nomepais
-      });
-    }
-    
     setIsEditing(true);
     setIsFormOpen(true);
   };
 
-  const handleOpenDetailsModal = (cidade: Cidade) => {
-    setSelectedCidade(cidade);
+  const handleOpenDetailsModal = (veiculo: Veiculo) => {
+    setSelectedVeiculo(veiculo);
     setIsDetailsModalOpen(true);
   };
 
   const handleCloseDetailsModal = () => {
     setIsDetailsModalOpen(false);
-    setSelectedCidade(null);
+    setSelectedVeiculo(null);
   };
 
   const formatDateTime = (dateString: string) => {
@@ -164,29 +142,29 @@ export default function CidadesPage() {
   };
 
   const handleDelete = async () => {
-    if (!cidadeToDelete) return;
+    if (!veiculoToDelete) return;
 
     try {
-      const response = await fetch(`/api/cidades?codcid=${cidadeToDelete.codcid}`, {
+      const response = await fetch(`/api/veiculos?codveiculo=${veiculoToDelete.codveiculo}`, {
         method: 'DELETE',
       });
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || 'Erro ao excluir cidade');
+        throw new Error(error.error || 'Erro ao excluir veículo');
       }
 
-      toast.success('Cidade excluída com sucesso!');
-      fetchCidades();
+      toast.success('Veículo excluído com sucesso!');
+      fetchVeiculos();
       setIsDeleteDialogOpen(false);
-      setCidadeToDelete(null);
+      setVeiculoToDelete(null);
     } catch (error) {
       console.error('Erro:', error);
-      toast.error(error instanceof Error ? error.message : 'Erro ao excluir cidade');
+      toast.error(error instanceof Error ? error.message : 'Erro ao excluir veículo');
     }
   };
 
-  const handleSort = (key: keyof Cidade) => {
+  const handleSort = (key: keyof Veiculo) => {
     if (sortKey === key) {
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
     } else {
@@ -195,89 +173,122 @@ export default function CidadesPage() {
     }
   };
 
-  const handleEstadoSelect = (estado: Estado | null) => {
-    setSelectedEstado(estado);
-    setFormData({ ...formData, codest: estado?.codest || 0 });
+  const formatPlaca = (placa: string) => {
+    // Remove tudo que não é letra ou número
+    const cleaned = placa.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+    
+    // Formato antigo: ABC-1234 ou novo: ABC1D23
+    if (cleaned.length <= 3) {
+      return cleaned;
+    } else if (cleaned.length <= 7) {
+      return cleaned.slice(0, 3) + '-' + cleaned.slice(3);
+    } else {
+      return cleaned.slice(0, 7);
+    }
   };
 
-  const filteredAndSortedCidades = cidades
-    .filter(cidade => 
-      cidade.codcid.toString().toLowerCase().includes(searchTerm.toLowerCase()) ||
-      cidade.nomecidade.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (cidade.nomeestado || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (cidade.siglaest || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (cidade.nomepais || '').toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredAndSortedVeiculos = veiculos
+    .filter(veiculo => 
+      veiculo.placa.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      veiculo.modelo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      veiculo.descricao?.toLowerCase().includes(searchTerm.toLowerCase())
     )
     .sort((a, b) => {
-      const aValue = String(a[sortKey]);
-      const bValue = String(b[sortKey]);
+      const aValue = String(a[sortKey] || '');
+      const bValue = String(b[sortKey] || '');
       return sortDirection === 'asc' 
         ? aValue.localeCompare(bValue)
         : bValue.localeCompare(aValue);
     });
 
   const columns = [
-    { key: 'codcid', label: 'Código' },
-    { key: 'nomecidade', label: 'Nome da Cidade' },
-    { key: 'siglaest', label: 'UF' },
-    { key: 'nomeestado', label: 'Estado' },
-    { key: 'nomepais', label: 'País' },
+    { 
+      key: 'codveiculo', 
+      label: 'Código',
+      render: (veiculo: Veiculo) => (
+        <span className="text-xs sm:text-sm font-medium">{veiculo.codveiculo}</span>
+      )
+    },
+    { 
+      key: 'placa', 
+      label: 'Placa',
+      render: (veiculo: Veiculo) => (
+        <span className="text-xs sm:text-sm font-mono font-medium">{veiculo.placa}</span>
+      )
+    },
+    { 
+      key: 'modelo', 
+      label: 'Modelo',
+      render: (veiculo: Veiculo) => (
+        <span className="text-xs sm:text-sm truncate">{veiculo.modelo || '-'}</span>
+      )
+    },
+    { 
+      key: 'descricao', 
+      label: 'Descrição',
+      render: (veiculo: Veiculo) => (
+        <span className="text-xs sm:text-sm truncate" title={veiculo.descricao}>
+          {veiculo.descricao || '-'}
+        </span>
+      )
+    },
     {
       key: 'situacao',
       label: 'Status',
-      render: (cidade: Cidade) => (
+      render: (veiculo: Veiculo) => (
         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-          cidade.situacao ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
+          veiculo.situacao ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
         }`}>
-          {cidade.situacao ? '🔴 Inativa' : '🟢 Ativa'}
+          {veiculo.situacao ? '🔴 Inativo' : '🟢 Ativo'}
         </span>
       )
     }
   ];
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8">
+    <div className="px-2 sm:px-4 lg:px-6 xl:px-8">
       <div className="sm:flex sm:items-center">
         <div className="sm:flex-auto">
-          <h1 className="text-base font-semibold leading-6 text-gray-900">Cidades</h1>
-          <p className="mt-2 text-sm text-gray-700">
-            Lista de todas as cidades cadastradas no sistema.
+          <h1 className="text-sm sm:text-base font-semibold leading-6 text-gray-900">Veículos</h1>
+          <p className="mt-1 sm:mt-2 text-xs sm:text-sm text-gray-700">
+            Lista de todos os veículos cadastrados no sistema.
           </p>
         </div>
-        <div className="mt-4 sm:ml-16 sm:mt-0 sm:flex-none flex items-center gap-3">
+        <div className="mt-3 sm:mt-4 sm:ml-8 lg:ml-16 sm:mt-0 sm:flex-none flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
           <div className="relative">
             <Input
               type="text"
-              placeholder="Buscar cidade..."
+              placeholder="Buscar veículo..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-[320px] pl-10"
+              className="w-full sm:w-[240px] lg:w-[320px] pl-10 text-sm"
             />
-            <MagnifyingGlassIcon className="h-5 w-5 absolute left-3 top-2.5 text-gray-400" />
+            <MagnifyingGlassIcon className="h-4 w-4 sm:h-5 sm:w-5 absolute left-3 top-2.5 text-gray-400" />
           </div>
           <Button
             onClick={() => {
               setFormData({
-                codcid: 0,
-                nomecidade: '',
-                codest: 0,
+                codveiculo: 0,
+                placa: '',
+                modelo: '',
+                descricao: '',
                 situacao: undefined
               });
-              setSelectedEstado(null);
               setIsEditing(false);
               setIsFormOpen(true);
             }}
-            className="bg-violet-600 hover:bg-violet-500"
+            className="bg-violet-600 hover:bg-violet-500 text-sm sm:text-base px-3 sm:px-4 py-2"
           >
-            <PlusIcon className="h-5 w-5 mr-2" />
-            Nova Cidade
+            <PlusIcon className="h-4 w-4 sm:h-5 sm:w-5 mr-1 sm:mr-2" />
+            <span className="hidden sm:inline">Novo Veículo</span>
+            <span className="sm:hidden">Novo</span>
           </Button>
         </div>
       </div>
 
-      <div className="mt-6">
+      <div className="mt-8 flow-root">
         <DataTable
-          data={filteredAndSortedCidades}
+          data={filteredAndSortedVeiculos}
           columns={columns}
           actions={[
             {
@@ -287,8 +298,8 @@ export default function CidadesPage() {
             }
           ]}
           onEdit={handleEdit}
-          onDelete={(cidade) => {
-            setCidadeToDelete(cidade);
+          onDelete={(veiculo) => {
+            setVeiculoToDelete(veiculo);
             setIsDeleteDialogOpen(true);
           }}
           sortKey={sortKey}
@@ -301,15 +312,15 @@ export default function CidadesPage() {
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{isEditing ? 'Editar Cidade' : 'Nova Cidade'}</DialogTitle>
+            <DialogTitle>{isEditing ? 'Editar Veículo' : 'Novo Veículo'}</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <Label htmlFor="codcid">Código</Label>
+                <Label htmlFor="codveiculo">Código</Label>
                 <Input
-                  id="codcid"
-                  value={isEditing ? formData.codcid : ''}
+                  id="codveiculo"
+                  value={isEditing ? formData.codveiculo : ''}
                   disabled
                   className="bg-gray-50"
                   placeholder={isEditing ? '' : 'Auto'}
@@ -337,25 +348,44 @@ export default function CidadesPage() {
                 </select>
               </div>
             </div>
+
             <div>
-              <Label htmlFor="nomecidade">Nome da Cidade *</Label>
+              <Label htmlFor="placa">Placa *</Label>
               <Input
-                id="nomecidade"
-                value={formData.nomecidade}
-                onChange={(e) => setFormData({ ...formData, nomecidade: e.target.value })}
-                placeholder="Digite o nome da cidade"
+                id="placa"
+                value={formData.placa}
+                onChange={(e) => setFormData({ ...formData, placa: formatPlaca(e.target.value) })}
+                placeholder="ABC-1234 ou ABC1D23"
                 required
+                maxLength={8}
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Formato: ABC-1234 (Mercosul) ou ABC1D23 (novo padrão)
+              </p>
+            </div>
+
+            <div>
+              <Label htmlFor="modelo">Modelo</Label>
+              <Input
+                id="modelo"
+                value={formData.modelo}
+                onChange={(e) => setFormData({ ...formData, modelo: e.target.value })}
+                placeholder="Ex: Scania R440, Volvo FH"
                 maxLength={100}
               />
             </div>
+
             <div>
-              <Label>Estado *</Label>
-              <EstadoSelect
-                value={selectedEstado}
-                onChange={handleEstadoSelect}
-                error={(!selectedEstado || !formData.codest) ? 'Estado é obrigatório' : undefined}
+              <Label htmlFor="descricao">Descrição</Label>
+              <Input
+                id="descricao"
+                value={formData.descricao}
+                onChange={(e) => setFormData({ ...formData, descricao: e.target.value })}
+                placeholder="Informações adicionais sobre o veículo"
+                maxLength={255}
               />
             </div>
+
             <DialogFooter>
               <Button
                 type="button"
@@ -378,11 +408,11 @@ export default function CidadesPage() {
           <DialogHeader>
             <DialogTitle className="text-xl font-semibold text-gray-900 flex items-center gap-2">
               <EyeIcon className="h-5 w-5 text-violet-600" />
-              Detalhes da Cidade
+              Detalhes do Veículo
             </DialogTitle>
           </DialogHeader>
           
-          {selectedCidade && (
+          {selectedVeiculo && (
             <div className="space-y-8">
               {/* Identificação */}
               <div>
@@ -393,49 +423,27 @@ export default function CidadesPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
                   <div className="flex justify-between items-center py-2 border-b border-gray-100">
                     <span className="text-sm font-medium text-gray-600">Código:</span>
-                    <span className="text-sm font-mono text-gray-900 bg-gray-50 px-2 py-1 rounded">{selectedCidade.codcid}</span>
+                    <span className="text-sm font-mono text-gray-900 bg-gray-50 px-2 py-1 rounded">{selectedVeiculo.codveiculo}</span>
                   </div>
                   <div className="flex justify-between items-center py-2 border-b border-gray-100">
                     <span className="text-sm font-medium text-gray-600">Status:</span>
                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                      selectedCidade.situacao ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
+                      selectedVeiculo.situacao ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
                     }`}>
-                      {selectedCidade.situacao ? '🔴 Inativa' : '🟢 Ativa'}
-                    </span>
-                  </div>
-                  <div className="md:col-span-2">
-                    <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                      <span className="text-sm font-medium text-gray-600">Nome da Cidade:</span>
-                      <span className="text-sm font-semibold text-gray-900 text-right max-w-[300px]">{selectedCidade.nomecidade}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Localização */}
-              <div className="pt-6 border-t border-gray-200">
-                <div className="flex items-center gap-2 mb-4">
-                  <div className="w-1 h-6 bg-blue-600 rounded-full"></div>
-                  <h3 className="text-lg font-semibold text-gray-900">Localização</h3>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
-                  <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                    <span className="text-sm font-medium text-gray-600">Estado:</span>
-                    <span className="text-sm font-semibold text-gray-900 text-right max-w-[200px]">{selectedCidade.nomeestado || '-'}</span>
-                  </div>
-                  <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                    <span className="text-sm font-medium text-gray-600">UF:</span>
-                    <span className="text-sm font-mono text-gray-900 bg-blue-50 px-3 py-2 rounded font-bold text-blue-800">
-                      {selectedCidade.siglaest || '-'}
+                      {selectedVeiculo.situacao ? '🔴 Inativo' : '🟢 Ativo'}
                     </span>
                   </div>
                   <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                    <span className="text-sm font-medium text-gray-600">País:</span>
-                    <span className="text-sm font-semibold text-gray-900 text-right max-w-[200px]">{selectedCidade.nomepais || '-'}</span>
+                    <span className="text-sm font-medium text-gray-600">Placa:</span>
+                    <span className="text-sm font-mono font-semibold text-gray-900 bg-gray-50 px-2 py-1 rounded">{selectedVeiculo.placa}</span>
                   </div>
                   <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                    <span className="text-sm font-medium text-gray-600">Código do Estado:</span>
-                    <span className="text-sm font-mono text-gray-900 bg-gray-50 px-2 py-1 rounded">{selectedCidade.codest}</span>
+                    <span className="text-sm font-medium text-gray-600">Modelo:</span>
+                    <span className="text-sm text-gray-900 text-right max-w-[200px]">{selectedVeiculo.modelo || '-'}</span>
+                  </div>
+                  <div className="md:col-span-2 flex justify-between items-start py-2 border-b border-gray-100">
+                    <span className="text-sm font-medium text-gray-600">Descrição:</span>
+                    <span className="text-sm text-gray-900 text-right max-w-[400px]">{selectedVeiculo.descricao || '-'}</span>
                   </div>
                 </div>
               </div>
@@ -450,13 +458,13 @@ export default function CidadesPage() {
                   <div className="flex justify-between items-center py-2 border-b border-gray-100">
                     <span className="text-sm font-medium text-gray-600">Data de Criação:</span>
                     <span className="text-sm font-mono text-gray-900 bg-gray-50 px-2 py-1 rounded">
-                      {formatDateTime(selectedCidade.data_criacao || '')}
+                      {formatDateTime(selectedVeiculo.data_criacao || '')}
                     </span>
                   </div>
                   <div className="flex justify-between items-center py-2 border-b border-gray-100">
                     <span className="text-sm font-medium text-gray-600">Última Atualização:</span>
                     <span className="text-sm font-mono text-gray-900 bg-gray-50 px-2 py-1 rounded">
-                      {formatDateTime(selectedCidade.data_alteracao || '')}
+                      {formatDateTime(selectedVeiculo.data_alteracao || '')}
                     </span>
                   </div>
                 </div>
@@ -471,7 +479,7 @@ export default function CidadesPage() {
             <Button 
               onClick={() => {
                 handleCloseDetailsModal();
-                handleEdit(selectedCidade!);
+                handleEdit(selectedVeiculo!);
               }}
               className="bg-violet-600 hover:bg-violet-500"
             >
@@ -489,9 +497,9 @@ export default function CidadesPage() {
             <DialogTitle>Confirmar Exclusão</DialogTitle>
           </DialogHeader>
           <div className="py-4">
-            <p>Tem certeza que deseja excluir a cidade <strong>{cidadeToDelete?.nomecidade}</strong>?</p>
+            <p>Tem certeza que deseja excluir o veículo <strong>{veiculoToDelete?.placa}</strong>?</p>
             <p className="text-sm text-gray-600 mt-2">
-              Esta ação não poderá ser desfeita e não será possível excluir se houver empresas ou pessoas vinculadas.
+              Esta ação não poderá ser desfeita.
             </p>
           </div>
           <DialogFooter>
@@ -502,11 +510,11 @@ export default function CidadesPage() {
             >
               Cancelar
             </Button>
-            <Button
-              type="button"
-              variant="destructive"
-              onClick={handleDelete}
-            >
+                          <Button
+                type="button"
+                variant="destructive"
+                onClick={handleDelete}
+              >
               Excluir
             </Button>
           </DialogFooter>

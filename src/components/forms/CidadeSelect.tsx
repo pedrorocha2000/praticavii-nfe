@@ -19,8 +19,18 @@ import { EstadoSelect } from './EstadoSelect';
 interface Cidade {
   codcid: number;
   nomecidade: string;
-  codest: string;
+  codest: number;
   nomeestado?: string;
+  siglaest?: string;
+  nomepais?: string;
+}
+
+interface Estado {
+  codest: number;
+  siglaest: string;
+  nomeestado: string;
+  codpais: number;
+  nomepais?: string;
 }
 
 interface CidadeSelectProps {
@@ -33,11 +43,11 @@ export function CidadeSelect({ value, onChange, error }: CidadeSelectProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [cidades, setCidades] = useState<Cidade[]>([]);
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
-  const [formData, setFormData] = useState<Omit<Cidade, 'nomeestado'>>({
-    codcid: 0,
+  const [formData, setFormData] = useState<{ nomecidade: string; codest: number }>({
     nomecidade: '',
-    codest: ''
+    codest: 0
   });
+  const [selectedEstado, setSelectedEstado] = useState<Estado | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
@@ -64,6 +74,17 @@ export function CidadeSelect({ value, onChange, error }: CidadeSelectProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!formData.nomecidade.trim()) {
+      toast.error('Nome da cidade é obrigatório');
+      return;
+    }
+
+    if (!formData.codest) {
+      toast.error('Estado é obrigatório');
+      return;
+    }
+
     try {
       const response = await fetch('/api/cidades', {
         method: 'POST',
@@ -78,6 +99,8 @@ export function CidadeSelect({ value, onChange, error }: CidadeSelectProps) {
       if (response.ok) {
         await fetchCidades();
         setIsFormModalOpen(false);
+        setFormData({ nomecidade: '', codest: 0 });
+        setSelectedEstado(null);
         handleSelect(data);
         toast.success('Cidade cadastrada com sucesso!');
       } else {
@@ -89,15 +112,23 @@ export function CidadeSelect({ value, onChange, error }: CidadeSelectProps) {
     }
   };
 
+  const handleEstadoSelect = (estado: Estado | null) => {
+    setSelectedEstado(estado);
+    setFormData({ ...formData, codest: estado?.codest || 0 });
+  };
+
   const filteredCidades = cidades.filter(cidade => 
-    cidade.codcid.toString().includes(searchTerm.toLowerCase()) ||
+    cidade.codcid.toString().toLowerCase().includes(searchTerm.toLowerCase()) ||
     cidade.nomecidade.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (cidade.nomeestado || '').toLowerCase().includes(searchTerm.toLowerCase())
+    (cidade.nomeestado || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (cidade.siglaest || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (cidade.nomepais || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const columns = [
     { key: 'codcid', label: 'Código' },
     { key: 'nomecidade', label: 'Nome' },
+    { key: 'siglaest', label: 'UF' },
     { key: 'nomeestado', label: 'Estado' },
   ];
 
@@ -122,7 +153,7 @@ export function CidadeSelect({ value, onChange, error }: CidadeSelectProps) {
 
       {/* Dialog de Seleção */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="max-w-3xl">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Selecionar Cidade</DialogTitle>
           </DialogHeader>
@@ -158,36 +189,28 @@ export function CidadeSelect({ value, onChange, error }: CidadeSelectProps) {
 
       {/* Dialog de Formulário */}
       <Dialog open={isFormModalOpen} onOpenChange={setIsFormModalOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Nova Cidade</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <Label htmlFor="codcid">Código</Label>
-              <Input
-                id="codcid"
-                type="number"
-                value={formData.codcid || ''}
-                onChange={(e) => setFormData({ ...formData, codcid: parseInt(e.target.value) || 0 })}
-                required
-              />
-            </div>
-            <div>
-              <Label htmlFor="nomecidade">Nome</Label>
+              <Label htmlFor="nomecidade">Nome da Cidade *</Label>
               <Input
                 id="nomecidade"
                 value={formData.nomecidade}
                 onChange={(e) => setFormData({ ...formData, nomecidade: e.target.value })}
+                placeholder="Digite o nome da cidade"
                 required
+                maxLength={100}
               />
             </div>
             <div>
-              <Label>Estado</Label>
+              <Label>Estado *</Label>
               <EstadoSelect
-                value={formData.codest ? { codest: formData.codest } as any : null}
-                onChange={(estado) => estado && setFormData({ ...formData, codest: estado.codest })}
-                error={error}
+                value={selectedEstado}
+                onChange={handleEstadoSelect}
+                error={!formData.codest ? 'Estado é obrigatório' : undefined}
               />
             </div>
             <DialogFooter>

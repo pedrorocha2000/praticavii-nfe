@@ -17,10 +17,17 @@ import { toast } from "sonner";
 import { PaisSelect } from './PaisSelect';
 
 interface Estado {
-  codest: string;
+  codest: number;
+  siglaest: string;
   nomeestado: string;
-  codpais: string;
+  codpais: number;
   nomepais?: string;
+}
+
+interface Pais {
+  codpais: number;
+  siglapais: string;
+  nomepais: string;
 }
 
 interface EstadoSelectProps {
@@ -33,11 +40,12 @@ export function EstadoSelect({ value, onChange, error }: EstadoSelectProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [estados, setEstados] = useState<Estado[]>([]);
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
-  const [formData, setFormData] = useState<Omit<Estado, 'nomepais'>>({
-    codest: '',
+  const [formData, setFormData] = useState<{ siglaest: string; nomeestado: string; codpais: number }>({
+    siglaest: '',
     nomeestado: '',
-    codpais: ''
+    codpais: 0
   });
+  const [selectedPais, setSelectedPais] = useState<Pais | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
@@ -64,6 +72,27 @@ export function EstadoSelect({ value, onChange, error }: EstadoSelectProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!formData.siglaest.trim()) {
+      toast.error('Sigla do estado é obrigatória');
+      return;
+    }
+
+    if (!formData.nomeestado.trim()) {
+      toast.error('Nome do estado é obrigatório');
+      return;
+    }
+
+    if (formData.siglaest.length < 1 || formData.siglaest.length > 4) {
+      toast.error('A sigla do estado deve ter entre 1 e 4 caracteres');
+      return;
+    }
+
+    if (!formData.codpais) {
+      toast.error('País é obrigatório');
+      return;
+    }
+
     try {
       const response = await fetch('/api/estados', {
         method: 'POST',
@@ -78,6 +107,8 @@ export function EstadoSelect({ value, onChange, error }: EstadoSelectProps) {
       if (response.ok) {
         await fetchEstados();
         setIsFormModalOpen(false);
+        setFormData({ siglaest: '', nomeestado: '', codpais: 0 });
+        setSelectedPais(null);
         handleSelect(data);
         toast.success('Estado cadastrado com sucesso!');
       } else {
@@ -89,14 +120,21 @@ export function EstadoSelect({ value, onChange, error }: EstadoSelectProps) {
     }
   };
 
+  const handlePaisSelect = (pais: Pais | null) => {
+    setSelectedPais(pais);
+    setFormData({ ...formData, codpais: pais?.codpais || 0 });
+  };
+
   const filteredEstados = estados.filter(estado => 
-    estado.codest.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    estado.codest.toString().toLowerCase().includes(searchTerm.toLowerCase()) ||
+    estado.siglaest.toLowerCase().includes(searchTerm.toLowerCase()) ||
     estado.nomeestado.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (estado.nomepais || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const columns = [
     { key: 'codest', label: 'Código' },
+    { key: 'siglaest', label: 'Sigla' },
     { key: 'nomeestado', label: 'Nome' },
     { key: 'nomepais', label: 'País' },
   ];
@@ -164,30 +202,34 @@ export function EstadoSelect({ value, onChange, error }: EstadoSelectProps) {
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <Label htmlFor="codest">Código</Label>
+              <Label htmlFor="siglaest">Sigla do Estado *</Label>
               <Input
-                id="codest"
-                value={formData.codest}
-                onChange={(e) => setFormData({ ...formData, codest: e.target.value })}
+                id="siglaest"
+                value={formData.siglaest}
+                onChange={(e) => setFormData({ ...formData, siglaest: e.target.value.toUpperCase() })}
+                placeholder="Ex: PR, 10, APY"
                 required
-                maxLength={2}
+                maxLength={4}
+                style={{ textTransform: 'uppercase' }}
               />
             </div>
             <div>
-              <Label htmlFor="nomeestado">Nome</Label>
+              <Label htmlFor="nomeestado">Nome do Estado *</Label>
               <Input
                 id="nomeestado"
                 value={formData.nomeestado}
                 onChange={(e) => setFormData({ ...formData, nomeestado: e.target.value })}
+                placeholder="Digite o nome do estado"
                 required
+                maxLength={50}
               />
             </div>
             <div>
-              <Label>País</Label>
+              <Label>País *</Label>
               <PaisSelect
-                value={formData.codpais ? { codpais: formData.codpais } as any : null}
-                onChange={(pais) => pais && setFormData({ ...formData, codpais: pais.codpais })}
-                error={error}
+                value={selectedPais}
+                onChange={handlePaisSelect}
+                error={!formData.codpais ? 'País é obrigatório' : undefined}
               />
             </div>
             <DialogFooter>

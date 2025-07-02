@@ -18,23 +18,22 @@ import { toast } from "sonner";
 interface FormaPagamento {
   codformapgto: number;
   descricao: string;
-  tipo: 'D' | 'C' | 'B' | 'P'; // Dinheiro, Cartão, Boleto, Pix
 }
 
 interface FormaPagamentoSelectProps {
   value?: FormaPagamento | null;
   onChange: (formaPagamento: FormaPagamento | null) => void;
   error?: string;
+  onFormaPagamentoCreated?: () => void;
 }
 
-export function FormaPagamentoSelect({ value, onChange, error }: FormaPagamentoSelectProps) {
+export function FormaPagamentoSelect({ value, onChange, error, onFormaPagamentoCreated }: FormaPagamentoSelectProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formasPagamento, setFormasPagamento] = useState<FormaPagamento[]>([]);
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [formData, setFormData] = useState<FormaPagamento>({
     codformapgto: 0,
-    descricao: '',
-    tipo: 'D'
+    descricao: ''
   });
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -58,26 +57,37 @@ export function FormaPagamentoSelect({ value, onChange, error }: FormaPagamentoS
   const handleSelect = (formaPagamento: FormaPagamento) => {
     onChange(formaPagamento);
     setIsModalOpen(false);
+    setSearchTerm(''); // Limpar busca
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    e.stopPropagation(); // Impede que o evento suba para o formulário pai
     try {
       const response = await fetch('/api/formas-pagamento', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({ descricao: formData.descricao }),
       });
 
       const data = await response.json();
 
       if (response.ok) {
+        // Atualizar a lista de formas de pagamento
         await fetchFormasPagamento();
+        // Notificar o componente pai para atualizar sua lista também
+        if (onFormaPagamentoCreated) {
+          onFormaPagamentoCreated();
+        }
+        // Fechar o modal de criação
         setIsFormModalOpen(false);
-        handleSelect(data);
-        toast.success('Forma de pagamento cadastrada com sucesso!');
+        // Limpar o formulário
+        setFormData({ codformapgto: 0, descricao: '' });
+        // Mostrar mensagem de sucesso
+        toast.success('Forma de pagamento cadastrada com sucesso! Agora selecione na lista.');
+        // NÃO auto-selecionar - deixar o usuário escolher da lista manualmente
       } else {
         toast.error(data.error || 'Erro ao salvar forma de pagamento');
       }
@@ -89,28 +99,12 @@ export function FormaPagamentoSelect({ value, onChange, error }: FormaPagamentoS
 
   const filteredFormasPagamento = formasPagamento.filter(formaPagamento => 
     formaPagamento.codformapgto.toString().includes(searchTerm.toLowerCase()) ||
-    formaPagamento.descricao.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    getTipoLabel(formaPagamento.tipo).toLowerCase().includes(searchTerm.toLowerCase())
+    formaPagamento.descricao.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const getTipoLabel = (tipo: 'D' | 'C' | 'B' | 'P') => {
-    switch (tipo) {
-      case 'D': return 'Dinheiro';
-      case 'C': return 'Cartão';
-      case 'B': return 'Boleto';
-      case 'P': return 'PIX';
-      default: return '';
-    }
-  };
-
   const columns = [
-    { key: 'codformapgto', label: 'Código' },
-    { key: 'descricao', label: 'Descrição' },
-    { 
-      key: 'tipo', 
-      label: 'Tipo', 
-      render: (formaPagamento: FormaPagamento) => getTipoLabel(formaPagamento.tipo)
-    },
+    { key: 'codformapgto', label: 'Código', className: 'w-20' },
+    { key: 'descricao', label: 'Descrição', className: 'flex-1' },
   ];
 
   return (
@@ -160,11 +154,13 @@ export function FormaPagamentoSelect({ value, onChange, error }: FormaPagamentoS
             </Button>
           </div>
 
+          <div className="max-h-[400px] overflow-y-auto">
           <DataTable
             data={filteredFormasPagamento}
             columns={columns}
             onRowClick={handleSelect}
           />
+          </div>
         </DialogContent>
       </Dialog>
 
@@ -176,44 +172,24 @@ export function FormaPagamentoSelect({ value, onChange, error }: FormaPagamentoS
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <Label htmlFor="codformapgto">Código</Label>
-              <Input
-                id="codformapgto"
-                type="number"
-                value={formData.codformapgto || ''}
-                onChange={(e) => setFormData({ ...formData, codformapgto: parseInt(e.target.value) || 0 })}
-                required
-              />
-            </div>
-            <div>
-              <Label htmlFor="descricao">Descrição</Label>
+              <Label htmlFor="descricao">Descrição *</Label>
               <Input
                 id="descricao"
                 value={formData.descricao}
                 onChange={(e) => setFormData({ ...formData, descricao: e.target.value })}
+                placeholder="Digite a descrição da forma de pagamento"
                 required
+                maxLength={50}
               />
-            </div>
-            <div>
-              <Label htmlFor="tipo">Tipo</Label>
-              <select
-                id="tipo"
-                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                value={formData.tipo}
-                onChange={(e) => setFormData({ ...formData, tipo: e.target.value as 'D' | 'C' | 'B' | 'P' })}
-                required
-              >
-                <option value="D">Dinheiro</option>
-                <option value="C">Cartão</option>
-                <option value="B">Boleto</option>
-                <option value="P">PIX</option>
-              </select>
             </div>
             <DialogFooter>
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setIsFormModalOpen(false)}
+                onClick={() => {
+                  setIsFormModalOpen(false);
+                  setFormData({ codformapgto: 0, descricao: '' });
+                }}
               >
                 Cancelar
               </Button>

@@ -16,7 +16,8 @@ import {
 import { toast } from "sonner";
 
 interface Pais {
-  codpais: string;
+  codpais: number;
+  siglapais: string;
   nomepais: string;
 }
 
@@ -30,7 +31,10 @@ export function PaisSelect({ value, onChange, error }: PaisSelectProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [paises, setPaises] = useState<Pais[]>([]);
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
-  const [formData, setFormData] = useState<Pais>({ codpais: '', nomepais: '' });
+  const [formData, setFormData] = useState<{ siglapais: string; nomepais: string }>({ 
+    siglapais: '', 
+    nomepais: '' 
+  });
   const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
@@ -58,8 +62,18 @@ export function PaisSelect({ value, onChange, error }: PaisSelectProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (formData.codpais.length !== 2) {
-      toast.error('O código do país deve ter exatamente 2 caracteres');
+    if (!formData.siglapais.trim()) {
+      toast.error('Sigla do país é obrigatória');
+      return;
+    }
+
+    if (!formData.nomepais.trim()) {
+      toast.error('Nome do país é obrigatório');
+      return;
+    }
+
+    if (formData.siglapais.length !== 2) {
+      toast.error('A sigla do país deve ter exatamente 2 caracteres');
       return;
     }
 
@@ -77,6 +91,7 @@ export function PaisSelect({ value, onChange, error }: PaisSelectProps) {
       if (response.ok) {
         await fetchPaises();
         setIsFormModalOpen(false);
+        setFormData({ siglapais: '', nomepais: '' });
         handleSelect(data);
         toast.success('País cadastrado com sucesso!');
       } else {
@@ -89,12 +104,14 @@ export function PaisSelect({ value, onChange, error }: PaisSelectProps) {
   };
 
   const filteredPaises = paises.filter(pais => 
-    pais.codpais.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    pais.codpais.toString().toLowerCase().includes(searchTerm.toLowerCase()) ||
+    pais.siglapais.toLowerCase().includes(searchTerm.toLowerCase()) ||
     pais.nomepais.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const columns = [
     { key: 'codpais', label: 'Código' },
+    { key: 'siglapais', label: 'Sigla' },
     { key: 'nomepais', label: 'Nome' },
   ];
 
@@ -161,28 +178,26 @@ export function PaisSelect({ value, onChange, error }: PaisSelectProps) {
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <Label htmlFor="codpais">Código</Label>
+              <Label htmlFor="siglapais">Sigla do País *</Label>
               <Input
-                id="codpais"
-                value={formData.codpais}
-                onChange={(e) => {
-                  const value = e.target.value.toUpperCase();
-                  setFormData({ ...formData, codpais: value });
-                  if (value && value.length !== 2) {
-                    toast.error('O código do país deve ter exatamente 2 caracteres');
-                  }
-                }}
+                id="siglapais"
+                value={formData.siglapais}
+                onChange={(e) => setFormData({ ...formData, siglapais: e.target.value.toUpperCase() })}
+                placeholder="Ex: BR, US, AR"
                 maxLength={2}
                 required
+                style={{ textTransform: 'uppercase' }}
               />
             </div>
             <div>
-              <Label htmlFor="nomepais">Nome</Label>
+              <Label htmlFor="nomepais">Nome do País *</Label>
               <Input
                 id="nomepais"
                 value={formData.nomepais}
                 onChange={(e) => setFormData({ ...formData, nomepais: e.target.value })}
+                placeholder="Digite o nome do país"
                 required
+                maxLength={50}
               />
             </div>
             <DialogFooter>

@@ -5,7 +5,7 @@ import { sql } from '@/database';
 export async function GET() {
   try {
     const cidades = await sql`
-      SELECT c.*, e.nomeestado, p.nomepais
+      SELECT c.codcid, c.nomecidade, c.codest, c.data_criacao, c.data_alteracao, c.situacao, e.nomeestado, e.siglaest, p.nomepais
       FROM sistema_nfe.cidades c
       LEFT JOIN sistema_nfe.estados e ON c.codest = e.codest
       LEFT JOIN sistema_nfe.paises p ON e.codpais = p.codpais
@@ -20,11 +20,11 @@ export async function GET() {
 // POST - Criar nova cidade
 export async function POST(request: Request) {
   try {
-    const { codcid, nomecidade, codest } = await request.json();
+    const { nomecidade, codest, situacao } = await request.json();
 
-    if (!codcid || !nomecidade || !codest) {
+    if (!nomecidade || !codest) {
       return NextResponse.json(
-        { error: 'Código, nome da cidade e código do estado são obrigatórios' },
+        { error: 'Nome da cidade e estado são obrigatórios' },
         { status: 400 }
       );
     }
@@ -41,35 +41,26 @@ export async function POST(request: Request) {
       );
     }
 
-    // Verificar se já existe uma cidade com o mesmo código
-    const cidadeExiste = await sql`
-      SELECT 1 FROM sistema_nfe.cidades WHERE codcid = ${codcid}
-    `;
-
-    if (cidadeExiste.length > 0) {
-      return NextResponse.json(
-        { error: 'Já existe uma cidade com este código' },
-        { status: 400 }
-      );
-    }
-
     const novaCidade = await sql`
-      INSERT INTO sistema_nfe.cidades (codcid, nomecidade, codest)
-      VALUES (${codcid}, ${nomecidade}, ${codest})
+      INSERT INTO sistema_nfe.cidades (nomecidade, codest, situacao)
+      VALUES (${nomecidade}, ${codest}, ${situacao || null})
       RETURNING *
     `;
 
     return NextResponse.json(novaCidade[0], { status: 201 });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Erro ao criar cidade:', error);
-    return NextResponse.json({ error: 'Erro ao criar cidade' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Erro ao criar cidade. Verifique os dados e tente novamente.' },
+      { status: 500 }
+    );
   }
 }
 
 // PUT - Atualizar cidade
 export async function PUT(request: Request) {
   try {
-    const { codcid, nomecidade, codest } = await request.json();
+    const { codcid, nomecidade, codest, situacao } = await request.json();
 
     if (!codcid || !nomecidade || !codest) {
       return NextResponse.json(
@@ -92,7 +83,7 @@ export async function PUT(request: Request) {
 
     const cidadeAtualizada = await sql`
       UPDATE sistema_nfe.cidades
-      SET nomecidade = ${nomecidade}, codest = ${codest}
+      SET nomecidade = ${nomecidade}, codest = ${codest}, situacao = ${situacao || null}
       WHERE codcid = ${codcid}
       RETURNING *
     `;

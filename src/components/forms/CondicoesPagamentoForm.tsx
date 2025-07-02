@@ -95,10 +95,18 @@ export default function CondicoesPagamentoForm({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    e.stopPropagation();
+
+    // Validar se todas as parcelas têm forma de pagamento
+    const parcelasIncompletas = formData.parcelas.some(p => !p.codformapgto || p.dias < 0 || p.percentual <= 0);
+    if (parcelasIncompletas) {
+      toast.error('Todas as parcelas devem ter forma de pagamento, dias e percentual válidos');
+      return;
+    }
 
     // Validar se o total de percentuais é 100%
     const totalPercentual = formData.parcelas.reduce((total, parcela) => total + parcela.percentual, 0);
-    if (totalPercentual !== 100) {
+    if (Math.abs(totalPercentual - 100) > 0.01) {
       toast.error('O total dos percentuais deve ser 100%');
       return;
     }
@@ -107,9 +115,17 @@ export default function CondicoesPagamentoForm({
       const url = '/api/cond_pgto';
       const method = isEditing ? 'PUT' : 'POST';
       
-      const payload = {
+      const payload = isEditing 
+        ? {
         codcondpgto: parseInt(formData.codcondpgto),
-        descricao: formData.descricao,
+            descricao: formData.descricao.trim(),
+            juros_perc: formData.juros_perc,
+            multa_perc: formData.multa_perc,
+            desconto_perc: formData.desconto_perc,
+            parcelas: formData.parcelas
+          }
+        : {
+            descricao: formData.descricao.trim(),
         juros_perc: formData.juros_perc,
         multa_perc: formData.multa_perc,
         desconto_perc: formData.desconto_perc,
@@ -199,13 +215,16 @@ export default function CondicoesPagamentoForm({
 
   const handleFormaPagamentoSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     try {
       const response = await fetch('/api/formas-pagamento', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(novaFormaPagamento),
+        body: JSON.stringify({
+          descricao: novaFormaPagamento.descricao.trim()
+        }),
       });
 
       if (!response.ok) {
@@ -214,14 +233,19 @@ export default function CondicoesPagamentoForm({
       }
 
       const savedData = await response.json();
-      toast.success('Forma de pagamento cadastrada com sucesso!');
+      toast.success('Forma de pagamento cadastrada com sucesso! Agora selecione na lista.');
       setIsFormaPagamentoFormOpen(false);
+      
+      // Limpa o formulário
+      setNovaFormaPagamento({
+        codformapgto: 0,
+        descricao: ''
+      });
       
       // Atualiza a lista de formas de pagamento
       fetchFormasPagamento();
       
-      // Seleciona automaticamente a forma de pagamento recém-criada
-      handleFormaPagamentoSelect(savedData);
+      // NÃO auto-selecionar - deixar o usuário escolher da lista manualmente
     } catch (error) {
       console.error('Erro:', error);
       toast.error(error instanceof Error ? error.message : 'Erro ao salvar forma de pagamento');
@@ -235,27 +259,16 @@ export default function CondicoesPagamentoForm({
 
   const content = (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="codcondpgto">Código</Label>
-          <Input
-            id="codcondpgto"
-            type="number"
-            value={formData.codcondpgto}
-            onChange={(e) => setFormData({ ...formData, codcondpgto: e.target.value })}
-            required
-            disabled={isEditing}
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="descricao">Descrição</Label>
+      <div>
+        <Label htmlFor="descricao">Descrição *</Label>
           <Input
             id="descricao"
             value={formData.descricao}
             onChange={(e) => setFormData({ ...formData, descricao: e.target.value })}
+          placeholder="Digite a descrição da condição de pagamento"
             required
+          maxLength={50}
           />
-        </div>
       </div>
 
       <div className="grid grid-cols-3 gap-4">
@@ -269,6 +282,7 @@ export default function CondicoesPagamentoForm({
             max="100"
             value={formData.juros_perc}
             onChange={(e) => setFormData({ ...formData, juros_perc: parseFloat(e.target.value) || 0 })}
+            placeholder="0.00"
           />
         </div>
         <div className="space-y-2">
@@ -281,6 +295,7 @@ export default function CondicoesPagamentoForm({
             max="100"
             value={formData.multa_perc}
             onChange={(e) => setFormData({ ...formData, multa_perc: parseFloat(e.target.value) || 0 })}
+            placeholder="0.00"
           />
         </div>
         <div className="space-y-2">
@@ -293,13 +308,14 @@ export default function CondicoesPagamentoForm({
             max="100"
             value={formData.desconto_perc}
             onChange={(e) => setFormData({ ...formData, desconto_perc: parseFloat(e.target.value) || 0 })}
+            placeholder="0.00"
           />
         </div>
       </div>
 
       <div className="space-y-4">
         <div className="flex justify-between items-center">
-          <Label>Parcelas</Label>
+          <Label>Parcelas *</Label>
           <Button
             type="button"
             variant="outline"
@@ -312,24 +328,25 @@ export default function CondicoesPagamentoForm({
         </div>
 
         {formData.parcelas.map((parcela, index) => (
-          <div key={parcela.numparc} className="grid grid-cols-12 gap-4 items-end border rounded-lg p-4">
+          <div key={parcela.numparc} className="grid grid-cols-12 gap-4 items-end border rounded-lg p-4 bg-gray-50">
             <div className="col-span-1">
               <Label>Nº</Label>
-              <div className="h-9 flex items-center">{parcela.numparc}</div>
+              <div className="h-9 flex items-center font-medium">{parcela.numparc}</div>
             </div>
             <div className="col-span-3">
-              <Label htmlFor={`dias-${index}`}>Dias</Label>
+              <Label htmlFor={`dias-${index}`}>Dias *</Label>
               <Input
                 id={`dias-${index}`}
                 type="number"
                 min="0"
                 value={parcela.dias}
-                onChange={(e) => handleParcelaChange(index, 'dias', parseInt(e.target.value))}
+                onChange={(e) => handleParcelaChange(index, 'dias', parseInt(e.target.value) || 0)}
+                placeholder="0"
                 required
               />
             </div>
             <div className="col-span-3">
-              <Label htmlFor={`percentual-${index}`}>Percentual (%)</Label>
+              <Label htmlFor={`percentual-${index}`}>Percentual (%) *</Label>
               <Input
                 id={`percentual-${index}`}
                 type="number"
@@ -337,12 +354,13 @@ export default function CondicoesPagamentoForm({
                 max="100"
                 step="0.01"
                 value={parcela.percentual}
-                onChange={(e) => handleParcelaChange(index, 'percentual', parseFloat(e.target.value))}
+                onChange={(e) => handleParcelaChange(index, 'percentual', parseFloat(e.target.value) || 0)}
+                placeholder="0.00"
                 required
               />
             </div>
             <div className="col-span-4">
-              <Label htmlFor={`formapgto-${index}`}>Forma de Pagamento</Label>
+              <Label htmlFor={`formapgto-${index}`}>Forma de Pagamento *</Label>
               <div className="flex gap-2">
                 <Input
                   id={`formapgto-${index}`}
@@ -379,8 +397,13 @@ export default function CondicoesPagamentoForm({
           </div>
         ))}
 
-        <div className="text-sm text-muted-foreground">
-          Total: {formData.parcelas.reduce((total, parcela) => total + parcela.percentual, 0)}%
+        <div className="p-3 bg-blue-50 rounded-lg">
+          <div className="text-sm">
+            <strong>Total dos percentuais: {formData.parcelas.reduce((total, p) => total + p.percentual, 0).toFixed(2)}%</strong>
+            {Math.abs(formData.parcelas.reduce((total, p) => total + p.percentual, 0) - 100) > 0.01 && (
+              <span className="text-red-600 ml-2">(Deve somar 100%)</span>
+            )}
+          </div>
         </div>
       </div>
 
@@ -388,7 +411,7 @@ export default function CondicoesPagamentoForm({
         <Button variant="outline" onClick={() => handleOpenChange(false)} type="button">
           Cancelar
         </Button>
-        <Button type="submit">
+        <Button type="submit" className="bg-violet-600 hover:bg-violet-500">
           {isEditing ? 'Atualizar' : 'Cadastrar'}
         </Button>
       </DialogFooter>
@@ -443,21 +466,12 @@ export default function CondicoesPagamentoForm({
               </DialogHeader>
               <form onSubmit={handleFormaPagamentoSubmit} className="space-y-4">
                 <div>
-                  <Label htmlFor="codformapgto">Código</Label>
-                  <Input
-                    id="codformapgto"
-                    type="number"
-                    value={novaFormaPagamento.codformapgto || ''}
-                    onChange={(e) => setNovaFormaPagamento({ ...novaFormaPagamento, codformapgto: parseInt(e.target.value) || 0 })}
-                    required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="descricao">Descrição</Label>
+                  <Label htmlFor="descricao">Descrição *</Label>
                   <Input
                     id="descricao"
                     value={novaFormaPagamento.descricao}
                     onChange={(e) => setNovaFormaPagamento({ ...novaFormaPagamento, descricao: e.target.value })}
+                    placeholder="Digite a descrição da forma de pagamento"
                     required
                   />
                 </div>
@@ -541,21 +555,12 @@ export default function CondicoesPagamentoForm({
             </DialogHeader>
             <form onSubmit={handleFormaPagamentoSubmit} className="space-y-4">
               <div>
-                <Label htmlFor="codformapgto">Código</Label>
-                <Input
-                  id="codformapgto"
-                  type="number"
-                  value={novaFormaPagamento.codformapgto || ''}
-                  onChange={(e) => setNovaFormaPagamento({ ...novaFormaPagamento, codformapgto: parseInt(e.target.value) || 0 })}
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="descricao">Descrição</Label>
+                <Label htmlFor="descricao">Descrição *</Label>
                 <Input
                   id="descricao"
                   value={novaFormaPagamento.descricao}
                   onChange={(e) => setNovaFormaPagamento({ ...novaFormaPagamento, descricao: e.target.value })}
+                  placeholder="Digite a descrição da forma de pagamento"
                   required
                 />
               </div>

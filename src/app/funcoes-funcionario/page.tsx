@@ -14,79 +14,71 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PlusIcon, MagnifyingGlassIcon, EyeIcon, PencilIcon } from '@heroicons/react/24/outline';
-import { EstadoSelect } from '@/components/forms/EstadoSelect';
 
-interface Cidade {
-  codcid: number;
-  nomecidade: string;
-  codest: number;
-  nomeestado?: string;
-  siglaest?: string;
-  nomepais?: string;
+interface FuncaoFuncionario {
+  codfuncao: number;
+  nome_funcao: string;
+  exige_cnh: boolean;
+  carga_horaria_semanal: number | null;
   data_criacao?: string;
   data_alteracao?: string;
   situacao?: string;
 }
 
-interface Estado {
-  codest: number;
-  siglaest: string;
-  nomeestado: string;
-  codpais: number;
-  nomepais?: string;
-}
-
-export default function CidadesPage() {
-  const [cidades, setCidades] = useState<Cidade[]>([]);
+export default function FuncoesFuncionarioPage() {
+  const [funcoes, setFuncoes] = useState<FuncaoFuncionario[]>([]);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
-  const [cidadeToDelete, setCidadeToDelete] = useState<Cidade | null>(null);
-  const [selectedCidade, setSelectedCidade] = useState<Cidade | null>(null);
+  const [funcaoToDelete, setFuncaoToDelete] = useState<FuncaoFuncionario | null>(null);
+  const [selectedFuncao, setSelectedFuncao] = useState<FuncaoFuncionario | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [formData, setFormData] = useState<Cidade>({
-    codcid: 0,
-    nomecidade: '',
-    codest: 0,
+  const [formData, setFormData] = useState<FuncaoFuncionario>({
+    codfuncao: 0,
+    nome_funcao: '',
+    exige_cnh: false,
+    carga_horaria_semanal: null,
     situacao: undefined
   });
   const [isEditing, setIsEditing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [sortKey, setSortKey] = useState<keyof Cidade>('nomecidade');
+  const [sortKey, setSortKey] = useState<keyof FuncaoFuncionario>('nome_funcao');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
-  const [selectedEstado, setSelectedEstado] = useState<Estado | null>(null);
 
   useEffect(() => {
-    fetchCidades();
+    fetchFuncoes();
   }, []);
 
-  const fetchCidades = async () => {
+  const fetchFuncoes = async () => {
     try {
-      const response = await fetch('/api/cidades');
-      if (!response.ok) throw new Error('Erro ao carregar cidades');
+      const response = await fetch('/api/funcoes-funcionario');
+      if (!response.ok) throw new Error('Erro ao carregar funções de funcionário');
       const data = await response.json();
-      setCidades(data);
+      setFuncoes(data);
     } catch (error) {
       console.error('Erro:', error);
-      toast.error('Erro ao carregar cidades');
+      toast.error('Erro ao carregar funções de funcionário');
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validação básica
-    if (!formData.nomecidade.trim()) {
-      toast.error('Nome da cidade é obrigatório');
+    // Validações básicas
+    if (!formData.nome_funcao.trim()) {
+      toast.error('Nome da função é obrigatório');
       return;
     }
 
-    if (!selectedEstado || !formData.codest) {
-      toast.error('Estado é obrigatório');
-      return;
+    // Validar carga horária se fornecida
+    if (formData.carga_horaria_semanal !== null && formData.carga_horaria_semanal !== undefined) {
+      if (formData.carga_horaria_semanal < 0 || formData.carga_horaria_semanal > 168) {
+        toast.error('Carga horária deve estar entre 0 e 168 horas');
+        return;
+      }
     }
 
     try {
-      const response = await fetch('/api/cidades', {
+      const response = await fetch('/api/funcoes-funcionario', {
         method: isEditing ? 'PUT' : 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -97,57 +89,46 @@ export default function CidadesPage() {
       const data = await response.json();
 
       if (response.ok) {
-        await fetchCidades();
+        await fetchFuncoes();
         setIsFormOpen(false);
         setFormData({
-          codcid: 0,
-          nomecidade: '',
-          codest: 0,
+          codfuncao: 0,
+          nome_funcao: '',
+          exige_cnh: false,
+          carga_horaria_semanal: null,
           situacao: undefined
         });
-        setSelectedEstado(null);
         setIsEditing(false);
-        toast.success(isEditing ? 'Cidade atualizada com sucesso!' : 'Cidade cadastrada com sucesso!');
+        toast.success(isEditing ? 'Função atualizada com sucesso!' : 'Função cadastrada com sucesso!');
       } else {
-        toast.error(data.error || 'Erro ao salvar cidade');
+        toast.error(data.error || 'Erro ao salvar função');
       }
     } catch (error) {
       console.error('Erro:', error);
-      toast.error('Erro ao salvar cidade');
+      toast.error('Erro ao salvar função');
     }
   };
 
-  const handleEdit = (cidade: Cidade) => {
+  const handleEdit = (funcao: FuncaoFuncionario) => {
     setFormData({
-      codcid: cidade.codcid,
-      nomecidade: cidade.nomecidade,
-      codest: cidade.codest,
-      situacao: cidade.situacao
+      codfuncao: funcao.codfuncao,
+      nome_funcao: funcao.nome_funcao,
+      exige_cnh: funcao.exige_cnh,
+      carga_horaria_semanal: funcao.carga_horaria_semanal,
+      situacao: funcao.situacao
     });
-    
-    // Configurar estado selecionado para o EstadoSelect
-    if (cidade.codest && cidade.nomeestado) {
-      setSelectedEstado({
-        codest: cidade.codest,
-        siglaest: cidade.siglaest || '',
-        nomeestado: cidade.nomeestado,
-        codpais: 0, // Será carregado pelo componente
-        nomepais: cidade.nomepais
-      });
-    }
-    
     setIsEditing(true);
     setIsFormOpen(true);
   };
 
-  const handleOpenDetailsModal = (cidade: Cidade) => {
-    setSelectedCidade(cidade);
+  const handleOpenDetailsModal = (funcao: FuncaoFuncionario) => {
+    setSelectedFuncao(funcao);
     setIsDetailsModalOpen(true);
   };
 
   const handleCloseDetailsModal = () => {
     setIsDetailsModalOpen(false);
-    setSelectedCidade(null);
+    setSelectedFuncao(null);
   };
 
   const formatDateTime = (dateString: string) => {
@@ -164,29 +145,29 @@ export default function CidadesPage() {
   };
 
   const handleDelete = async () => {
-    if (!cidadeToDelete) return;
+    if (!funcaoToDelete) return;
 
     try {
-      const response = await fetch(`/api/cidades?codcid=${cidadeToDelete.codcid}`, {
+      const response = await fetch(`/api/funcoes-funcionario?codfuncao=${funcaoToDelete.codfuncao}`, {
         method: 'DELETE',
       });
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || 'Erro ao excluir cidade');
+        throw new Error(error.error || 'Erro ao excluir função');
       }
 
-      toast.success('Cidade excluída com sucesso!');
-      fetchCidades();
+      toast.success('Função excluída com sucesso!');
+      fetchFuncoes();
       setIsDeleteDialogOpen(false);
-      setCidadeToDelete(null);
+      setFuncaoToDelete(null);
     } catch (error) {
       console.error('Erro:', error);
-      toast.error(error instanceof Error ? error.message : 'Erro ao excluir cidade');
+      toast.error(error instanceof Error ? error.message : 'Erro ao excluir função');
     }
   };
 
-  const handleSort = (key: keyof Cidade) => {
+  const handleSort = (key: keyof FuncaoFuncionario) => {
     if (sortKey === key) {
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
     } else {
@@ -195,41 +176,48 @@ export default function CidadesPage() {
     }
   };
 
-  const handleEstadoSelect = (estado: Estado | null) => {
-    setSelectedEstado(estado);
-    setFormData({ ...formData, codest: estado?.codest || 0 });
-  };
-
-  const filteredAndSortedCidades = cidades
-    .filter(cidade => 
-      cidade.codcid.toString().toLowerCase().includes(searchTerm.toLowerCase()) ||
-      cidade.nomecidade.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (cidade.nomeestado || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (cidade.siglaest || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (cidade.nomepais || '').toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredAndSortedFuncoes = funcoes
+    .filter(funcao => 
+      funcao.codfuncao.toString().toLowerCase().includes(searchTerm.toLowerCase()) ||
+      funcao.nome_funcao.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (funcao.exige_cnh ? 'sim' : 'não').includes(searchTerm.toLowerCase()) ||
+      (funcao.carga_horaria_semanal?.toString() || '').includes(searchTerm.toLowerCase())
     )
     .sort((a, b) => {
-      const aValue = String(a[sortKey]);
-      const bValue = String(b[sortKey]);
+      const aValue = String(a[sortKey] || '');
+      const bValue = String(b[sortKey] || '');
       return sortDirection === 'asc' 
         ? aValue.localeCompare(bValue)
         : bValue.localeCompare(aValue);
     });
 
   const columns = [
-    { key: 'codcid', label: 'Código' },
-    { key: 'nomecidade', label: 'Nome da Cidade' },
-    { key: 'siglaest', label: 'UF' },
-    { key: 'nomeestado', label: 'Estado' },
-    { key: 'nomepais', label: 'País' },
+    { key: 'codfuncao', label: 'Código' },
+    { key: 'nome_funcao', label: 'Nome da Função' },
+    { 
+      key: 'exige_cnh', 
+      label: 'Exige CNH',
+      render: (funcao: FuncaoFuncionario) => (
+        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+          funcao.exige_cnh ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+        }`}>
+          {funcao.exige_cnh ? 'Sim' : 'Não'}
+        </span>
+      )
+    },
+    { 
+      key: 'carga_horaria_semanal', 
+      label: 'Carga Horária/Semana',
+      render: (funcao: FuncaoFuncionario) => funcao.carga_horaria_semanal ? `${funcao.carga_horaria_semanal}h` : '-'
+    },
     {
       key: 'situacao',
       label: 'Status',
-      render: (cidade: Cidade) => (
+      render: (funcao: FuncaoFuncionario) => (
         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-          cidade.situacao ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
+          funcao.situacao ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
         }`}>
-          {cidade.situacao ? '🔴 Inativa' : '🟢 Ativa'}
+          {funcao.situacao ? '🔴 Inativo' : '🟢 Ativo'}
         </span>
       )
     }
@@ -239,16 +227,16 @@ export default function CidadesPage() {
     <div className="px-4 sm:px-6 lg:px-8">
       <div className="sm:flex sm:items-center">
         <div className="sm:flex-auto">
-          <h1 className="text-base font-semibold leading-6 text-gray-900">Cidades</h1>
+          <h1 className="text-base font-semibold leading-6 text-gray-900">Funções de Funcionário</h1>
           <p className="mt-2 text-sm text-gray-700">
-            Lista de todas as cidades cadastradas no sistema.
+            Lista de todas as funções de funcionário cadastradas no sistema.
           </p>
         </div>
         <div className="mt-4 sm:ml-16 sm:mt-0 sm:flex-none flex items-center gap-3">
           <div className="relative">
             <Input
               type="text"
-              placeholder="Buscar cidade..."
+              placeholder="Buscar função..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-[320px] pl-10"
@@ -258,26 +246,26 @@ export default function CidadesPage() {
           <Button
             onClick={() => {
               setFormData({
-                codcid: 0,
-                nomecidade: '',
-                codest: 0,
+                codfuncao: 0,
+                nome_funcao: '',
+                exige_cnh: false,
+                carga_horaria_semanal: null,
                 situacao: undefined
               });
-              setSelectedEstado(null);
               setIsEditing(false);
               setIsFormOpen(true);
             }}
             className="bg-violet-600 hover:bg-violet-500"
           >
             <PlusIcon className="h-5 w-5 mr-2" />
-            Nova Cidade
+            Nova Função
           </Button>
         </div>
       </div>
 
       <div className="mt-6">
         <DataTable
-          data={filteredAndSortedCidades}
+          data={filteredAndSortedFuncoes}
           columns={columns}
           actions={[
             {
@@ -287,8 +275,8 @@ export default function CidadesPage() {
             }
           ]}
           onEdit={handleEdit}
-          onDelete={(cidade) => {
-            setCidadeToDelete(cidade);
+          onDelete={(funcao) => {
+            setFuncaoToDelete(funcao);
             setIsDeleteDialogOpen(true);
           }}
           sortKey={sortKey}
@@ -299,17 +287,17 @@ export default function CidadesPage() {
 
       {/* Dialog de Formulário */}
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>{isEditing ? 'Editar Cidade' : 'Nova Cidade'}</DialogTitle>
+            <DialogTitle>{isEditing ? 'Editar Função de Funcionário' : 'Nova Função de Funcionário'}</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <Label htmlFor="codcid">Código</Label>
+                <Label htmlFor="codfuncao">Código</Label>
                 <Input
-                  id="codcid"
-                  value={isEditing ? formData.codcid : ''}
+                  id="codfuncao"
+                  value={isEditing ? formData.codfuncao : ''}
                   disabled
                   className="bg-gray-50"
                   placeholder={isEditing ? '' : 'Auto'}
@@ -338,24 +326,47 @@ export default function CidadesPage() {
               </div>
             </div>
             <div>
-              <Label htmlFor="nomecidade">Nome da Cidade *</Label>
+              <Label htmlFor="nome_funcao">Nome da Função *</Label>
               <Input
-                id="nomecidade"
-                value={formData.nomecidade}
-                onChange={(e) => setFormData({ ...formData, nomecidade: e.target.value })}
-                placeholder="Digite o nome da cidade"
+                id="nome_funcao"
+                value={formData.nome_funcao}
+                onChange={(e) => setFormData({ ...formData, nome_funcao: e.target.value })}
+                placeholder="Digite o nome da função (ex: Desenvolvedor, Motorista)"
                 required
                 maxLength={100}
               />
             </div>
-            <div>
-              <Label>Estado *</Label>
-              <EstadoSelect
-                value={selectedEstado}
-                onChange={handleEstadoSelect}
-                error={(!selectedEstado || !formData.codest) ? 'Estado é obrigatório' : undefined}
+
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="exige_cnh"
+                checked={formData.exige_cnh}
+                onChange={(e) => setFormData({ ...formData, exige_cnh: e.target.checked })}
+                className="h-4 w-4 text-violet-600 focus:ring-violet-500 border-gray-300 rounded"
               />
+              <Label htmlFor="exige_cnh">Esta função exige CNH</Label>
             </div>
+
+            <div>
+              <Label htmlFor="carga_horaria_semanal">Carga Horária Semanal (horas)</Label>
+              <Input
+                id="carga_horaria_semanal"
+                type="number"
+                value={formData.carga_horaria_semanal || ''}
+                onChange={(e) => setFormData({ 
+                  ...formData, 
+                  carga_horaria_semanal: e.target.value ? parseInt(e.target.value) : null 
+                })}
+                placeholder="Ex: 40, 44, 48"
+                min="0"
+                max="168"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Opcional. Máximo 168 horas (24h × 7 dias)
+              </p>
+            </div>
+
             <DialogFooter>
               <Button
                 type="button"
@@ -378,11 +389,11 @@ export default function CidadesPage() {
           <DialogHeader>
             <DialogTitle className="text-xl font-semibold text-gray-900 flex items-center gap-2">
               <EyeIcon className="h-5 w-5 text-violet-600" />
-              Detalhes da Cidade
+              Detalhes da Função
             </DialogTitle>
           </DialogHeader>
           
-          {selectedCidade && (
+          {selectedFuncao && (
             <div className="space-y-8">
               {/* Identificação */}
               <div>
@@ -393,49 +404,43 @@ export default function CidadesPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
                   <div className="flex justify-between items-center py-2 border-b border-gray-100">
                     <span className="text-sm font-medium text-gray-600">Código:</span>
-                    <span className="text-sm font-mono text-gray-900 bg-gray-50 px-2 py-1 rounded">{selectedCidade.codcid}</span>
+                    <span className="text-sm font-mono text-gray-900 bg-gray-50 px-2 py-1 rounded">{selectedFuncao.codfuncao}</span>
                   </div>
                   <div className="flex justify-between items-center py-2 border-b border-gray-100">
                     <span className="text-sm font-medium text-gray-600">Status:</span>
                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                      selectedCidade.situacao ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
+                      selectedFuncao.situacao ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
                     }`}>
-                      {selectedCidade.situacao ? '🔴 Inativa' : '🟢 Ativa'}
+                      {selectedFuncao.situacao ? '🔴 Inativo' : '🟢 Ativo'}
                     </span>
                   </div>
-                  <div className="md:col-span-2">
-                    <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                      <span className="text-sm font-medium text-gray-600">Nome da Cidade:</span>
-                      <span className="text-sm font-semibold text-gray-900 text-right max-w-[300px]">{selectedCidade.nomecidade}</span>
-                    </div>
+                  <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                    <span className="text-sm font-medium text-gray-600">Nome da Função:</span>
+                    <span className="text-sm font-semibold text-gray-900 text-right max-w-[200px]">{selectedFuncao.nome_funcao}</span>
                   </div>
                 </div>
               </div>
 
-              {/* Localização */}
-              <div className="pt-6 border-t border-gray-200">
+              {/* Dados da Função */}
+              <div>
                 <div className="flex items-center gap-2 mb-4">
-                  <div className="w-1 h-6 bg-blue-600 rounded-full"></div>
-                  <h3 className="text-lg font-semibold text-gray-900">Localização</h3>
+                  <div className="w-1 h-6 bg-amber-600 rounded-full"></div>
+                  <h3 className="text-lg font-semibold text-gray-900">Dados da Função</h3>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
                   <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                    <span className="text-sm font-medium text-gray-600">Estado:</span>
-                    <span className="text-sm font-semibold text-gray-900 text-right max-w-[200px]">{selectedCidade.nomeestado || '-'}</span>
-                  </div>
-                  <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                    <span className="text-sm font-medium text-gray-600">UF:</span>
-                    <span className="text-sm font-mono text-gray-900 bg-blue-50 px-3 py-2 rounded font-bold text-blue-800">
-                      {selectedCidade.siglaest || '-'}
+                    <span className="text-sm font-medium text-gray-600">Exige CNH:</span>
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                      selectedFuncao.exige_cnh ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                    }`}>
+                      {selectedFuncao.exige_cnh ? 'Sim' : 'Não'}
                     </span>
                   </div>
                   <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                    <span className="text-sm font-medium text-gray-600">País:</span>
-                    <span className="text-sm font-semibold text-gray-900 text-right max-w-[200px]">{selectedCidade.nomepais || '-'}</span>
-                  </div>
-                  <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                    <span className="text-sm font-medium text-gray-600">Código do Estado:</span>
-                    <span className="text-sm font-mono text-gray-900 bg-gray-50 px-2 py-1 rounded">{selectedCidade.codest}</span>
+                    <span className="text-sm font-medium text-gray-600">Carga Horária Semanal:</span>
+                    <span className="text-sm text-gray-900">
+                      {selectedFuncao.carga_horaria_semanal ? `${selectedFuncao.carga_horaria_semanal}h` : '-'}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -450,13 +455,13 @@ export default function CidadesPage() {
                   <div className="flex justify-between items-center py-2 border-b border-gray-100">
                     <span className="text-sm font-medium text-gray-600">Data de Criação:</span>
                     <span className="text-sm font-mono text-gray-900 bg-gray-50 px-2 py-1 rounded">
-                      {formatDateTime(selectedCidade.data_criacao || '')}
+                      {formatDateTime(selectedFuncao.data_criacao || '')}
                     </span>
                   </div>
                   <div className="flex justify-between items-center py-2 border-b border-gray-100">
                     <span className="text-sm font-medium text-gray-600">Última Atualização:</span>
                     <span className="text-sm font-mono text-gray-900 bg-gray-50 px-2 py-1 rounded">
-                      {formatDateTime(selectedCidade.data_alteracao || '')}
+                      {formatDateTime(selectedFuncao.data_alteracao || '')}
                     </span>
                   </div>
                 </div>
@@ -471,7 +476,7 @@ export default function CidadesPage() {
             <Button 
               onClick={() => {
                 handleCloseDetailsModal();
-                handleEdit(selectedCidade!);
+                handleEdit(selectedFuncao!);
               }}
               className="bg-violet-600 hover:bg-violet-500"
             >
@@ -489,9 +494,9 @@ export default function CidadesPage() {
             <DialogTitle>Confirmar Exclusão</DialogTitle>
           </DialogHeader>
           <div className="py-4">
-            <p>Tem certeza que deseja excluir a cidade <strong>{cidadeToDelete?.nomecidade}</strong>?</p>
+            <p>Tem certeza que deseja excluir a função <strong>{funcaoToDelete?.nome_funcao}</strong>?</p>
             <p className="text-sm text-gray-600 mt-2">
-              Esta ação não poderá ser desfeita e não será possível excluir se houver empresas ou pessoas vinculadas.
+              Esta ação não poderá ser desfeita e não será possível excluir se houver funcionários vinculados.
             </p>
           </div>
           <DialogFooter>

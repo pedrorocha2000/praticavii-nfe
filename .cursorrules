@@ -1,0 +1,98 @@
+# CURSOR AI RULES - SISTEMA NFe
+
+## CONTEXTO PRINCIPAL
+Este é um sistema de gerenciamento de Notas Fiscais Eletrônicas (NFe) em Next.js 14 + TypeScript + PostgreSQL.
+SEMPRE consulte o arquivo PROJECT_CONTEXT.md para detalhes completos.
+
+## REGRAS OBRIGATÓRIAS
+
+### 1. VALIDAÇÕES CPF/CNPJ
+- CPF/CNPJ é obrigatório APENAS para cidades brasileiras
+- Use validação matemática completa (não apenas formato)
+- Implemente nos dois lados: frontend E backend
+- Função padrão: `validateCPFCNPJ(document, tipopessoa, country)`
+
+### 2. LABELS DINÂMICAS
+- Pessoa Física (F):
+  - Clientes: "Cliente"
+  - Funcionários: "Nome" 
+  - Fornecedores: "Fornecedor"
+- Pessoa Jurídica (J): "Razão Social" (todos)
+
+### 3. VALIDAÇÃO DE CIDADE
+SEMPRE validar:
+```typescript
+if (!selectedCidade || !selectedCidade.codcid) {
+  setError('Por favor, selecione uma cidade válida.');
+  return;
+}
+```
+
+### 4. ESTRUTURA PADRÃO DOS CRUDs
+- Frontend: formData, isEditing, showModal, data, loading
+- Backend: GET, POST, PUT, DELETE com validações
+- Modais para criação/edição
+- Tabelas com busca e ordenação
+
+### 5. NOMENCLATURA
+- tipopessoa: 'F' ou 'J'
+- nomerazao: nome ou razão social
+- cpfcnpj: sem formatação no banco
+- codcid: código da cidade (obrigatório)
+
+## PADRÕES DE CÓDIGO
+
+### TypeScript
+- Sempre tipar interfaces
+- Props tipadas em componentes
+- Strict mode habilitado
+
+### Styling
+- Tailwind CSS exclusivamente
+- Mobile-first
+- Classes utilitárias consistentes
+
+### Validações
+- Frontend: tempo real com feedback
+- Backend: sempre validar também
+- Mensagens de erro específicas e claras
+
+## ARQUIVOS IMPORTANTES
+- `PROJECT_CONTEXT.md`: Documentação completa
+- `.env`: Configurações do banco
+- `src/app/*/page.tsx`: CRUDs frontend
+- `src/app/api/*/route.ts`: APIs backend
+
+## BANCO DE DADOS
+```
+Host: localhost:5432
+Database: sistema_nfe
+User: postgres
+Password: 1234
+```
+
+## DEBUGGING
+1. Sempre logar dados enviados para API
+2. Verificar response em caso de erro
+3. Validar estrutura antes do envio
+4. Problemas comuns: CPF/CNPJ inválido, cidade não selecionada, labels incorretas
+
+## QUANDO FAZER MUDANÇAS
+1. Leia o PROJECT_CONTEXT.md primeiro
+2. Mantenha consistência com padrões existentes
+3. Valide frontend E backend
+4. Teste com dados reais
+5. Atualize documentação se necessário
+
+## NÃO FAÇA
+- Não ignore validações de CPF/CNPJ
+- Não esqueça validação de cidade
+- Não use labels fixas (sempre condicionais)
+- Não implemente apenas frontend OU backend
+- Não mude padrões sem consultar contexto
+
+## COMANDOS ÚTEIS
+- Desenvolvimento: `npm run dev`
+- Banco: `psql -U postgres -h localhost -p 5432 -d sistema_nfe`
+
+LEMBRE-SE: Este projeto tem padrões específicos. SEMPRE consulte PROJECT_CONTEXT.md antes de fazer alterações! 

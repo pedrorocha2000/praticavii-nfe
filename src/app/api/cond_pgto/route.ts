@@ -11,6 +11,9 @@ export async function GET(request: Request) {
         cp.juros_perc,
         cp.multa_perc,
         cp.desconto_perc,
+        cp.data_criacao,
+        cp.data_alteracao,
+        cp.situacao,
         json_agg(
           json_build_object(
             'numparc', pcp.numparc,
@@ -19,11 +22,11 @@ export async function GET(request: Request) {
             'dias', pcp.dias,
             'percentual', pcp.percentual
           ) ORDER BY pcp.numparc
-        ) as parcelas
+        ) FILTER (WHERE pcp.numparc IS NOT NULL) as parcelas
       FROM sistema_nfe.cond_pgto cp
       LEFT JOIN sistema_nfe.parcelas_contapgto pcp ON cp.codcondpgto = pcp.codcondpgto
       LEFT JOIN sistema_nfe.formapgto fp ON pcp.codformapgto = fp.codformapgto
-      GROUP BY cp.codcondpgto, cp.descricao, cp.juros_perc, cp.multa_perc, cp.desconto_perc
+      GROUP BY cp.codcondpgto, cp.descricao, cp.juros_perc, cp.multa_perc, cp.desconto_perc, cp.data_criacao, cp.data_alteracao, cp.situacao
       ORDER BY cp.codcondpgto
     `;
 
@@ -40,12 +43,12 @@ export async function GET(request: Request) {
 // POST - Criar nova condição de pagamento
 export async function POST(request: Request) {
   try {
-    const { codcondpgto, descricao, juros_perc, multa_perc, desconto_perc, parcelas } = await request.json();
+    const { descricao, juros_perc, multa_perc, desconto_perc, parcelas, situacao } = await request.json();
 
     // Validações básicas
-    if (!codcondpgto || !descricao || !parcelas || !Array.isArray(parcelas) || parcelas.length === 0) {
+    if (!descricao || !parcelas || !Array.isArray(parcelas) || parcelas.length === 0) {
       return NextResponse.json(
-        { error: 'Campos obrigatórios não preenchidos' },
+        { error: 'Descrição e parcelas são obrigatórias' },
         { status: 400 }
       );
     }
@@ -59,14 +62,14 @@ export async function POST(request: Request) {
       );
     }
 
-    // Verificar se já existe
-    const condPgtoExiste = await sql`
-      SELECT 1 FROM sistema_nfe.cond_pgto WHERE codcondpgto = ${codcondpgto}
+    // Verificar se descrição já existe
+    const descricaoExiste = await sql`
+      SELECT 1 FROM sistema_nfe.cond_pgto WHERE UPPER(descricao) = UPPER(${descricao})
     `;
 
-    if (condPgtoExiste.length > 0) {
+    if (descricaoExiste.length > 0) {
       return NextResponse.json(
-        { error: 'Condição de pagamento já existe' },
+        { error: 'Já existe uma condição de pagamento com esta descrição' },
         { status: 400 }
       );
     }
@@ -92,23 +95,25 @@ export async function POST(request: Request) {
       }
     }
 
-    // Inserir condição de pagamento
+    // Inserir condição de pagamento (auto increment)
     const novaCondPgto = await sql`
       INSERT INTO sistema_nfe.cond_pgto (
-        codcondpgto,
         descricao,
         juros_perc,
         multa_perc,
-        desconto_perc
+        desconto_perc,
+        situacao
       ) VALUES (
-        ${codcondpgto},
         ${descricao},
         ${juros_perc || 0},
         ${multa_perc || 0},
-        ${desconto_perc || 0}
+        ${desconto_perc || 0},
+        ${situacao || null}
       )
       RETURNING *
     `;
+
+    const codcondpgto = novaCondPgto[0].codcondpgto;
 
     // Inserir parcelas
     for (const parcela of parcelas) {
@@ -132,6 +137,12 @@ export async function POST(request: Request) {
     return NextResponse.json(novaCondPgto[0], { status: 201 });
   } catch (error) {
     console.error('Erro ao criar condição de pagamento:', error);
+    if (error.message.includes('duplicate key')) {
+      return NextResponse.json(
+        { error: 'Condição de pagamento com esta descrição já existe' },
+        { status: 400 }
+      );
+    }
     return NextResponse.json(
       { error: 'Erro ao criar condição de pagamento' },
       { status: 500 }
@@ -142,12 +153,12 @@ export async function POST(request: Request) {
 // PUT - Atualizar condição de pagamento
 export async function PUT(request: Request) {
   try {
-    const { codcondpgto, descricao, juros_perc, multa_perc, desconto_perc, parcelas } = await request.json();
+    const { codcondpgto, descricao, juros_perc, multa_perc, desconto_perc, parcelas, situacao } = await request.json();
 
     // Validações básicas
     if (!codcondpgto || !descricao || !parcelas || !Array.isArray(parcelas) || parcelas.length === 0) {
       return NextResponse.json(
-        { error: 'Campos obrigatórios não preenchidos' },
+        { error: 'Código, descrição e parcelas são obrigatórios' },
         { status: 400 }
       );
     }
@@ -170,6 +181,20 @@ export async function PUT(request: Request) {
       return NextResponse.json(
         { error: 'Condição de pagamento não encontrada' },
         { status: 404 }
+      );
+    }
+
+    // Verificar se descrição já existe (exceto para o registro atual)
+    const descricaoExiste = await sql`
+      SELECT 1 FROM sistema_nfe.cond_pgto 
+      WHERE UPPER(descricao) = UPPER(${descricao}) 
+      AND codcondpgto != ${codcondpgto}
+    `;
+
+    if (descricaoExiste.length > 0) {
+      return NextResponse.json(
+        { error: 'Já existe uma condição de pagamento com esta descrição' },
+        { status: 400 }
       );
     }
 
@@ -201,7 +226,8 @@ export async function PUT(request: Request) {
         descricao = ${descricao},
         juros_perc = ${juros_perc || 0},
         multa_perc = ${multa_perc || 0},
-        desconto_perc = ${desconto_perc || 0}
+        desconto_perc = ${desconto_perc || 0},
+        situacao = ${situacao || null}
       WHERE codcondpgto = ${codcondpgto}
       RETURNING *
     `;
@@ -234,6 +260,12 @@ export async function PUT(request: Request) {
     return NextResponse.json(condPgtoAtualizada[0]);
   } catch (error) {
     console.error('Erro ao atualizar condição de pagamento:', error);
+    if (error.message.includes('duplicate key')) {
+      return NextResponse.json(
+        { error: 'Condição de pagamento com esta descrição já existe' },
+        { status: 400 }
+      );
+    }
     return NextResponse.json(
       { error: 'Erro ao atualizar condição de pagamento' },
       { status: 500 }
@@ -254,39 +286,56 @@ export async function DELETE(request: Request) {
       );
     }
 
-    // Verificar se está sendo usada em notas fiscais
-    const notasVinculadas = await sql`
-      SELECT 1 FROM sistema_nfe.nfe WHERE codcondpgto = ${parseInt(codcondpgto)}
+    // Verificar se está sendo usada
+    const referencias = await sql`
+      SELECT 
+        (SELECT COUNT(*) FROM sistema_nfe.nfe WHERE codcondpgto = ${parseInt(codcondpgto)}) as nfe_count,
+        (SELECT COUNT(*) FROM sistema_nfe.clientes WHERE codcondpgto = ${parseInt(codcondpgto)}) as clientes_count,
+        (SELECT COUNT(*) FROM sistema_nfe.fornecedores WHERE codcondpgto = ${parseInt(codcondpgto)}) as fornecedores_count
     `;
 
-    if (notasVinculadas.length > 0) {
+    const counts = referencias[0];
+    const totalRefs = counts.nfe_count + counts.clientes_count + counts.fornecedores_count;
+
+    if (totalRefs > 0) {
+      const mensagens = [];
+      if (counts.nfe_count > 0) mensagens.push(`${counts.nfe_count} nota(s) fiscal(is)`);
+      if (counts.clientes_count > 0) mensagens.push(`${counts.clientes_count} cliente(s)`);
+      if (counts.fornecedores_count > 0) mensagens.push(`${counts.fornecedores_count} fornecedor(es)`);
+      
       return NextResponse.json(
-        { error: 'Não é possível excluir pois existem notas fiscais vinculadas' },
+        { error: `Não é possível excluir pois existem registros vinculados: ${mensagens.join(', ')}` },
         { status: 400 }
       );
     }
 
-    // Excluir parcelas
-    await sql`
-      DELETE FROM sistema_nfe.parcelas_contapgto
-      WHERE codcondpgto = ${parseInt(codcondpgto)}
+    // Verificar se existe
+    const condPgtoExiste = await sql`
+      SELECT 1 FROM sistema_nfe.cond_pgto WHERE codcondpgto = ${parseInt(codcondpgto)}
     `;
 
-    // Excluir condição de pagamento
-    const condPgtoExcluida = await sql`
-      DELETE FROM sistema_nfe.cond_pgto
-      WHERE codcondpgto = ${parseInt(codcondpgto)}
-      RETURNING *
-    `;
-
-    if (condPgtoExcluida.length === 0) {
+    if (condPgtoExiste.length === 0) {
       return NextResponse.json(
         { error: 'Condição de pagamento não encontrada' },
         { status: 404 }
       );
     }
 
-    return NextResponse.json({ message: 'Condição de pagamento excluída com sucesso' });
+    // Excluir parcelas primeiro (foreign key)
+    await sql`
+      DELETE FROM sistema_nfe.parcelas_contapgto
+      WHERE codcondpgto = ${parseInt(codcondpgto)}
+    `;
+
+    // Excluir condição de pagamento
+    await sql`
+      DELETE FROM sistema_nfe.cond_pgto
+      WHERE codcondpgto = ${parseInt(codcondpgto)}
+    `;
+
+    return NextResponse.json({ 
+      message: 'Condição de pagamento excluída com sucesso' 
+    });
   } catch (error) {
     console.error('Erro ao excluir condição de pagamento:', error);
     return NextResponse.json(

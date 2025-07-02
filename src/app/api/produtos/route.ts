@@ -1,94 +1,172 @@
 import { NextResponse } from 'next/server';
 import { sql } from '@/database';
-import { CreateProdutoDTO, UpdateProdutoDTO } from '@/types/produto';
 
-// GET - Listar todos os produtos
+// GET - Listar todos os produtos com relacionamentos
 export async function GET() {
   try {
     const result = await sql`
-      SELECT codprod, nome, ncm, unidade, valorunitario, datacadastro
-      FROM sistema_nfe.produtos
-      ORDER BY codprod
+      SELECT 
+        p.codprod,
+        p.nome,
+        p.valorunitario,
+        p.datacadastro,
+        p.codunidade,
+        p.codcategoria,
+        p.codmarca,
+        p.custo_compra,
+        p.preco_venda,
+        p.lucro_percentual,
+        p.codigo_barras,
+        p.codigo_referencia,
+        p.quantidade_estoque,
+        p.quantidade_minima_estoque,
+        p.data_alteracao,
+        p.situacao,
+        um.nome_unidade,
+        um.sigla_unidade,
+        c.nome_categoria,
+        m.nome_marca
+      FROM sistema_nfe.produtos p
+      LEFT JOIN sistema_nfe.unidades_medida um ON p.codunidade = um.codunidade
+      LEFT JOIN sistema_nfe.categorias c ON p.codcategoria = c.codcategoria
+      LEFT JOIN sistema_nfe.marcas m ON p.codmarca = m.codmarca
+      ORDER BY p.codprod
     `;
     return NextResponse.json(result);
   } catch (error) {
-    console.error('Error fetching products:', error);
-    return NextResponse.json({ error: 'Failed to fetch products' }, { status: 500 });
+    console.error('Erro ao buscar produtos:', error);
+    return NextResponse.json({ error: 'Erro ao buscar produtos' }, { status: 500 });
   }
 }
 
 // POST - Criar novo produto
 export async function POST(request: Request) {
   try {
-    const body: CreateProdutoDTO = await request.json();
+    const body = await request.json();
 
-    if (!body.nome) {
-      return NextResponse.json(
-        { error: 'Product name is required' },
-        { status: 400 }
-      );
+    // Validações obrigatórias
+    if (!body.nome?.trim()) {
+      return NextResponse.json({ error: 'Nome do produto é obrigatório' }, { status: 400 });
+    }
+
+    // Validar código de barras único se fornecido
+    if (body.codigo_barras?.trim()) {
+      const existingBarcode = await sql`
+        SELECT codprod FROM sistema_nfe.produtos 
+        WHERE codigo_barras = ${body.codigo_barras.trim()}
+      `;
+      
+      if (existingBarcode.length > 0) {
+        return NextResponse.json({ error: 'Código de barras já existe' }, { status: 400 });
+      }
+    }
+
+    // Calcular lucro percentual se tiver custo e preço
+    let lucroPercentual = null;
+    if (body.custo_compra && body.preco_venda && body.custo_compra > 0) {
+      lucroPercentual = ((body.preco_venda - body.custo_compra) / body.custo_compra) * 100;
     }
 
     const result = await sql`
       INSERT INTO sistema_nfe.produtos (
-        nome, ncm, unidade, valorunitario, datacadastro
+        nome, 
+        valorunitario,
+        codunidade, 
+        codcategoria, 
+        codmarca,
+        custo_compra,
+        preco_venda,
+        lucro_percentual,
+        codigo_barras,
+        codigo_referencia,
+        quantidade_estoque,
+        quantidade_minima_estoque,
+        situacao
       ) VALUES (
-        ${body.nome},
-        ${body.ncm},
-        ${body.unidade},
-        ${body.valorunitario},
-        ${body.datacadastro || sql`CURRENT_DATE`}
+        ${body.nome.trim()},
+        ${body.valorunitario || null},
+        ${body.codunidade || null},
+        ${body.codcategoria || null},
+        ${body.codmarca || null},
+        ${body.custo_compra || null},
+        ${body.preco_venda || null},
+        ${lucroPercentual},
+        ${body.codigo_barras?.trim() || null},
+        ${body.codigo_referencia?.trim() || null},
+        ${body.quantidade_estoque || null},
+        ${body.quantidade_minima_estoque || null},
+        ${body.situacao || null}
       )
-      RETURNING codprod, nome, ncm, unidade, valorunitario, datacadastro
+      RETURNING *
     `;
 
-    return NextResponse.json(result[0]);
+    return NextResponse.json(result[0], { status: 201 });
   } catch (error) {
-    console.error('Error creating product:', error);
-    return NextResponse.json(
-      { error: 'Failed to create product' },
-      { status: 500 }
-    );
+    console.error('Erro ao criar produto:', error);
+    return NextResponse.json({ error: 'Erro ao criar produto' }, { status: 500 });
   }
 }
 
 // PUT - Atualizar produto
 export async function PUT(request: Request) {
   try {
-    const body: UpdateProdutoDTO = await request.json();
+    const body = await request.json();
 
     if (!body.codprod) {
-      return NextResponse.json(
-        { error: 'Product code is required' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Código do produto é obrigatório' }, { status: 400 });
+    }
+
+    if (!body.nome?.trim()) {
+      return NextResponse.json({ error: 'Nome do produto é obrigatório' }, { status: 400 });
+    }
+
+    // Validar código de barras único se fornecido
+    if (body.codigo_barras?.trim()) {
+      const existingBarcode = await sql`
+        SELECT codprod FROM sistema_nfe.produtos 
+        WHERE codigo_barras = ${body.codigo_barras.trim()}
+        AND codprod != ${body.codprod}
+      `;
+      
+      if (existingBarcode.length > 0) {
+        return NextResponse.json({ error: 'Código de barras já existe' }, { status: 400 });
+      }
+    }
+
+    // Calcular lucro percentual se tiver custo e preço
+    let lucroPercentual = null;
+    if (body.custo_compra && body.preco_venda && body.custo_compra > 0) {
+      lucroPercentual = ((body.preco_venda - body.custo_compra) / body.custo_compra) * 100;
     }
 
     const result = await sql`
       UPDATE sistema_nfe.produtos
       SET 
-        nome = ${body.nome || null},
-        ncm = ${body.ncm || null},
-        unidade = ${body.unidade || null},
-        valorunitario = ${body.valorunitario || 0}
+        nome = ${body.nome.trim()},
+        valorunitario = ${body.valorunitario || null},
+        codunidade = ${body.codunidade || null},
+        codcategoria = ${body.codcategoria || null},
+        codmarca = ${body.codmarca || null},
+        custo_compra = ${body.custo_compra || null},
+        preco_venda = ${body.preco_venda || null},
+        lucro_percentual = ${lucroPercentual},
+        codigo_barras = ${body.codigo_barras?.trim() || null},
+        codigo_referencia = ${body.codigo_referencia?.trim() || null},
+        quantidade_estoque = ${body.quantidade_estoque || null},
+        quantidade_minima_estoque = ${body.quantidade_minima_estoque || null},
+        situacao = ${body.situacao || null}
       WHERE codprod = ${body.codprod}
-      RETURNING codprod, nome, ncm, unidade, valorunitario, datacadastro
+      RETURNING *
     `;
 
     if (result.length === 0) {
-      return NextResponse.json(
-        { error: 'Product not found' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'Produto não encontrado' }, { status: 404 });
     }
 
     return NextResponse.json(result[0]);
   } catch (error) {
-    console.error('Error updating product:', error);
-    return NextResponse.json(
-      { error: 'Failed to update product' },
-      { status: 500 }
-    );
+    console.error('Erro ao atualizar produto:', error);
+    return NextResponse.json({ error: 'Erro ao atualizar produto' }, { status: 500 });
   }
 }
 
@@ -99,34 +177,31 @@ export async function DELETE(request: Request) {
     const codprod = searchParams.get('codprod');
 
     if (!codprod) {
-      return NextResponse.json(
-        { error: 'Product code is required' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Código do produto é obrigatório' }, { status: 400 });
     }
 
-    // Check if product is linked to any invoices
+    // Verificar se produto está vinculado a NFes
     const linkedInvoices = await sql`
-      SELECT COUNT(*) FROM sistema_nfe.produtos_nfe
+      SELECT COUNT(*) as count FROM sistema_nfe.produtos_nfe
       WHERE codprod = ${codprod}
     `;
 
     if (linkedInvoices[0].count > 0) {
       return NextResponse.json(
-        { error: 'Cannot delete product: linked to invoices' },
+        { error: 'Não é possível excluir: produto vinculado a notas fiscais' }, 
         { status: 400 }
       );
     }
 
-    // Check if product is linked to any suppliers
+    // Verificar se produto está vinculado a fornecedores
     const linkedSuppliers = await sql`
-      SELECT COUNT(*) FROM sistema_nfe.produto_forn
+      SELECT COUNT(*) as count FROM sistema_nfe.produto_forn
       WHERE codprod = ${codprod}
     `;
 
     if (linkedSuppliers[0].count > 0) {
       return NextResponse.json(
-        { error: 'Cannot delete product: linked to suppliers' },
+        { error: 'Não é possível excluir: produto vinculado a fornecedores' }, 
         { status: 400 }
       );
     }
@@ -138,18 +213,12 @@ export async function DELETE(request: Request) {
     `;
 
     if (result.length === 0) {
-      return NextResponse.json(
-        { error: 'Product not found' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'Produto não encontrado' }, { status: 404 });
     }
 
-    return NextResponse.json({ message: 'Product deleted successfully' });
+    return NextResponse.json({ message: 'Produto excluído com sucesso' });
   } catch (error) {
-    console.error('Error deleting product:', error);
-    return NextResponse.json(
-      { error: 'Failed to delete product' },
-      { status: 500 }
-    );
+    console.error('Erro ao excluir produto:', error);
+    return NextResponse.json({ error: 'Erro ao excluir produto' }, { status: 500 });
   }
 }

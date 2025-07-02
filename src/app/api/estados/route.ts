@@ -5,7 +5,7 @@ import { sql } from '@/database';
 export async function GET() {
   try {
     const estados = await sql`
-      SELECT e.codest, e.nomeestado, e.codpais, p.nomepais
+      SELECT e.codest, e.siglaest, e.nomeestado, e.codpais, e.data_criacao, e.data_alteracao, e.situacao, p.nomepais
       FROM sistema_nfe.estados e
       LEFT JOIN sistema_nfe.paises p ON e.codpais = p.codpais
       ORDER BY e.nomeestado
@@ -20,34 +20,34 @@ export async function GET() {
 // POST - Criar novo estado
 export async function POST(request: Request) {
   try {
-    const { codest, nomeestado, codpais } = await request.json();
+    const { siglaest, nomeestado, codpais, situacao } = await request.json();
 
-    if (!codest || !nomeestado || !codpais) {
+    if (!siglaest || !nomeestado || !codpais) {
       return NextResponse.json(
-        { error: 'Código, nome do estado e código do país são obrigatórios' },
+        { error: 'Sigla, nome do estado e país são obrigatórios' },
         { status: 400 }
       );
     }
 
-    // Validar o tamanho do código do estado
-    if (codest.length !== 2) {
+    // Validar o tamanho da sigla do estado
+    if (siglaest.length < 1 || siglaest.length > 4) {
       return NextResponse.json(
-        { error: 'O código do estado deve ter exatamente 2 caracteres' },
+        { error: 'A sigla do estado deve ter entre 1 e 4 caracteres' },
         { status: 400 }
       );
     }
 
-    // Converter para maiúsculas
-    const codestUpper = codest.toUpperCase();
+    // Converter sigla para maiúsculas
+    const siglaestUpper = siglaest.toUpperCase();
 
-    // Verificar se o estado já existe
-    const estadoExiste = await sql`
-      SELECT 1 FROM sistema_nfe.estados WHERE codest = ${codestUpper}
+    // Verificar se a sigla já existe
+    const siglaExiste = await sql`
+      SELECT 1 FROM sistema_nfe.estados WHERE siglaest = ${siglaestUpper}
     `;
 
-    if (estadoExiste.length > 0) {
+    if (siglaExiste.length > 0) {
       return NextResponse.json(
-        { error: 'Este código de estado já está em uso' },
+        { error: 'Esta sigla de estado já está em uso' },
         { status: 400 }
       );
     }
@@ -65,8 +65,8 @@ export async function POST(request: Request) {
     }
 
     const novoEstado = await sql`
-      INSERT INTO sistema_nfe.estados (codest, nomeestado, codpais)
-      VALUES (${codestUpper}, ${nomeestado}, ${codpais})
+      INSERT INTO sistema_nfe.estados (siglaest, nomeestado, codpais, situacao)
+      VALUES (${siglaestUpper}, ${nomeestado}, ${codpais}, ${situacao || null})
       RETURNING *
     `;
 
@@ -76,7 +76,7 @@ export async function POST(request: Request) {
     
     if (error.code === '23505') {
       return NextResponse.json(
-        { error: 'Este código de estado já está em uso' },
+        { error: 'Esta sigla de estado já está em uso' },
         { status: 400 }
       );
     }
@@ -91,11 +91,35 @@ export async function POST(request: Request) {
 // PUT - Atualizar estado
 export async function PUT(request: Request) {
   try {
-    const { codest, nomeestado, codpais } = await request.json();
+    const { codest, siglaest, nomeestado, codpais, situacao } = await request.json();
 
-    if (!codest || !nomeestado || !codpais) {
+    if (!codest || !siglaest || !nomeestado || !codpais) {
       return NextResponse.json(
-        { error: 'Código, nome do estado e código do país são obrigatórios' },
+        { error: 'Código, sigla, nome do estado e país são obrigatórios' },
+        { status: 400 }
+      );
+    }
+
+    // Validar o tamanho da sigla do estado
+    if (siglaest.length < 1 || siglaest.length > 4) {
+      return NextResponse.json(
+        { error: 'A sigla do estado deve ter entre 1 e 4 caracteres' },
+        { status: 400 }
+      );
+    }
+
+    // Converter sigla para maiúsculas
+    const siglaestUpper = siglaest.toUpperCase();
+
+    // Verificar se a sigla já existe em outro estado
+    const siglaExiste = await sql`
+      SELECT 1 FROM sistema_nfe.estados 
+      WHERE siglaest = ${siglaestUpper} AND codest != ${codest}
+    `;
+
+    if (siglaExiste.length > 0) {
+      return NextResponse.json(
+        { error: 'Esta sigla de estado já está em uso' },
         { status: 400 }
       );
     }
@@ -114,7 +138,7 @@ export async function PUT(request: Request) {
 
     const estadoAtualizado = await sql`
       UPDATE sistema_nfe.estados
-      SET nomeestado = ${nomeestado}, codpais = ${codpais}
+      SET siglaest = ${siglaestUpper}, nomeestado = ${nomeestado}, codpais = ${codpais}, situacao = ${situacao || null}
       WHERE codest = ${codest}
       RETURNING *
     `;

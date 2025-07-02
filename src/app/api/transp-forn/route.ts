@@ -2,9 +2,20 @@ import { NextResponse } from 'next/server';
 import { sql } from '@/database';
 
 // GET - Listar todos os relacionamentos transportadora-fornecedor
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const relacionamentos = await sql`
+    const { searchParams } = new URL(request.url);
+    const codtrans = searchParams.get('codtrans');
+    const codforn = searchParams.get('codforn');
+
+    if (!codtrans && !codforn) {
+      return NextResponse.json(
+        { error: 'Código da transportadora ou código do fornecedor é obrigatório' },
+        { status: 400 }
+      );
+    }
+
+    const result = await sql`
       SELECT 
         tf.codtrans,
         tf.codforn,
@@ -13,11 +24,13 @@ export async function GET() {
       FROM sistema_nfe.transp_forn tf
       JOIN sistema_nfe.transportadoras t ON t.codtrans = tf.codtrans
       JOIN sistema_nfe.fornecedores f ON f.codforn = tf.codforn
-      JOIN sistema_nfe.pessoa pt ON pt.codigo = t.codtrans
-      JOIN sistema_nfe.pessoa pf ON pf.codigo = f.codforn
-      ORDER BY pt.nomerazao, pf.nomerazao
+      JOIN sistema_nfe.pessoa pt ON pt.codigo = t.codpessoa
+      JOIN sistema_nfe.pessoa pf ON pf.codigo = f.codpessoa
+      WHERE ${codtrans ? sql`tf.codtrans = ${codtrans}` : sql`tf.codforn = ${codforn}`}
+      ORDER BY ${codtrans ? sql`pf.nomerazao` : sql`pt.nomerazao`}
     `;
-    return NextResponse.json(relacionamentos);
+
+    return NextResponse.json(result);
   } catch (error) {
     console.error('Erro ao buscar relacionamentos transportadora-fornecedor:', error);
     return NextResponse.json(

@@ -5,14 +5,20 @@ import { sql } from '@/database';
 export async function GET() {
   try {
     const veiculos = await sql`
-      SELECT v.placa, v.codtrans, p.nomerazao as nome_transportadora
-      FROM sistema_nfe.veiculos v
-      LEFT JOIN sistema_nfe.transportadoras t ON v.codtrans = t.codtrans
-      LEFT JOIN sistema_nfe.pessoa p ON t.codtrans = p.codigo
-      ORDER BY v.placa
+      SELECT 
+        codveiculo,
+        placa, 
+        modelo,
+        descricao,
+        data_criacao,
+        data_alteracao,
+        situacao
+      FROM sistema_nfe.veiculos
+      ORDER BY placa
     `;
     return NextResponse.json(veiculos);
   } catch (error) {
+    console.error('Erro ao buscar veículos:', error);
     return NextResponse.json({ error: 'Erro ao buscar veículos' }, { status: 500 });
   }
 }
@@ -22,25 +28,14 @@ export async function POST(request: Request) {
   try {
     const {
       placa,
-      codtrans
+      modelo,
+      descricao
     } = await request.json();
 
-    if (!placa || !codtrans) {
+    if (!placa) {
       return NextResponse.json(
-        { error: 'Placa e código da transportadora são obrigatórios' },
+        { error: 'Placa é obrigatória' },
         { status: 400 }
-      );
-    }
-
-    // Verificar se a transportadora existe
-    const transportadoraExiste = await sql`
-      SELECT 1 FROM sistema_nfe.transportadoras WHERE codtrans = ${codtrans}
-    `;
-
-    if (transportadoraExiste.length === 0) {
-      return NextResponse.json(
-        { error: 'Transportadora não encontrada' },
-        { status: 404 }
       );
     }
 
@@ -58,13 +53,14 @@ export async function POST(request: Request) {
 
     // Inserir o veículo
     const novoVeiculo = await sql`
-      INSERT INTO sistema_nfe.veiculos (placa, codtrans)
-      VALUES (${placa}, ${codtrans})
+      INSERT INTO sistema_nfe.veiculos (placa, modelo, descricao)
+      VALUES (${placa}, ${modelo || null}, ${descricao || null})
       RETURNING *
     `;
 
     return NextResponse.json(novoVeiculo[0], { status: 201 });
   } catch (error) {
+    console.error('Erro ao criar veículo:', error);
     return NextResponse.json({ error: 'Erro ao criar veículo' }, { status: 500 });
   }
 }
@@ -73,32 +69,23 @@ export async function POST(request: Request) {
 export async function PUT(request: Request) {
   try {
     const {
+      codveiculo,
       placa,
-      codtrans
+      modelo,
+      descricao,
+      situacao
     } = await request.json();
 
-    if (!placa || !codtrans) {
+    if (!codveiculo) {
       return NextResponse.json(
-        { error: 'Placa e código da transportadora são obrigatórios' },
+        { error: 'Código do veículo é obrigatório' },
         { status: 400 }
-      );
-    }
-
-    // Verificar se a transportadora existe
-    const transportadoraExiste = await sql`
-      SELECT 1 FROM sistema_nfe.transportadoras WHERE codtrans = ${codtrans}
-    `;
-
-    if (transportadoraExiste.length === 0) {
-      return NextResponse.json(
-        { error: 'Transportadora não encontrada' },
-        { status: 404 }
       );
     }
 
     // Verificar se o veículo existe
     const veiculoExiste = await sql`
-      SELECT 1 FROM sistema_nfe.veiculos WHERE placa = ${placa}
+      SELECT 1 FROM sistema_nfe.veiculos WHERE codveiculo = ${codveiculo}
     `;
 
     if (veiculoExiste.length === 0) {
@@ -111,13 +98,18 @@ export async function PUT(request: Request) {
     // Atualizar o veículo
     const veiculoAtualizado = await sql`
       UPDATE sistema_nfe.veiculos
-      SET codtrans = ${codtrans}
-      WHERE placa = ${placa}
+      SET 
+        placa = ${placa},
+        modelo = ${modelo || null},
+        descricao = ${descricao || null},
+        situacao = ${situacao || null}
+      WHERE codveiculo = ${codveiculo}
       RETURNING *
     `;
 
     return NextResponse.json(veiculoAtualizado[0]);
   } catch (error) {
+    console.error('Erro ao atualizar veículo:', error);
     return NextResponse.json({ error: 'Erro ao atualizar veículo' }, { status: 500 });
   }
 }
@@ -126,11 +118,11 @@ export async function PUT(request: Request) {
 export async function DELETE(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const placa = searchParams.get('placa');
+    const codveiculo = searchParams.get('codveiculo');
 
-    if (!placa) {
+    if (!codveiculo) {
       return NextResponse.json(
-        { error: 'Placa do veículo é obrigatória' },
+        { error: 'Código do veículo é obrigatório' },
         { status: 400 }
       );
     }
@@ -138,7 +130,7 @@ export async function DELETE(request: Request) {
     // Excluir o veículo
     const veiculoExcluido = await sql`
       DELETE FROM sistema_nfe.veiculos
-      WHERE placa = ${placa}
+      WHERE codveiculo = ${codveiculo}
       RETURNING *
     `;
 
@@ -148,6 +140,7 @@ export async function DELETE(request: Request) {
 
     return NextResponse.json({ message: 'Veículo excluído com sucesso' });
   } catch (error) {
+    console.error('Erro ao excluir veículo:', error);
     return NextResponse.json({ error: 'Erro ao excluir veículo' }, { status: 500 });
   }
 } 

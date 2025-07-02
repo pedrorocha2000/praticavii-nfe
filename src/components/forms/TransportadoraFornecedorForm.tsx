@@ -5,9 +5,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { MagnifyingGlassIcon, XMarkIcon } from '@heroicons/react/24/outline';
 
-interface Produto {
-  codprod: number;
-  nome: string;
+interface Transportadora {
+  codtrans: number;
+  nomerazao: string;
 }
 
 interface Fornecedor {
@@ -15,13 +15,13 @@ interface Fornecedor {
   nomerazao: string;
 }
 
-interface ProdutoFornecedorFormProps {
-  modo: 'produto' | 'fornecedor';
-  item: Produto | Fornecedor;
+interface TransportadoraFornecedorFormProps {
+  modo: 'transportadora' | 'fornecedor';
+  item: Transportadora | Fornecedor;
   onClose: () => void;
 }
 
-export default function ProdutoFornecedorForm({ modo, item, onClose }: ProdutoFornecedorFormProps) {
+export default function TransportadoraFornecedorForm({ modo, item, onClose }: TransportadoraFornecedorFormProps) {
   const [search, setSearch] = useState('');
   const [searchVinculados, setSearchVinculados] = useState('');
   const [suggestions, setSuggestions] = useState<any[]>([]);
@@ -49,14 +49,14 @@ export default function ProdutoFornecedorForm({ modo, item, onClose }: ProdutoFo
     try {
       setIsLoading(true);
       
-      if (modo === 'produto') {
-        const response = await fetch(`/api/produto-forn?codprod=${(item as Produto).codprod}`);
+      if (modo === 'transportadora') {
+        const response = await fetch(`/api/transp-forn?codtrans=${(item as Transportadora).codtrans}`);
         if (response.ok) {
           const data = await response.json();
           setVinculados(data);
         }
       } else {
-        const response = await fetch(`/api/produto-forn?codforn=${(item as Fornecedor).codforn}`);
+        const response = await fetch(`/api/transp-forn?codforn=${(item as Fornecedor).codforn}`);
         if (response.ok) {
           const data = await response.json();
           setVinculados(data);
@@ -78,7 +78,7 @@ export default function ProdutoFornecedorForm({ modo, item, onClose }: ProdutoFo
 
     try {
       setIsSearching(true);
-      const endpoint = modo === 'produto' ? '/api/fornecedores' : '/api/produtos';
+      const endpoint = modo === 'transportadora' ? '/api/fornecedores' : '/api/transportadoras';
       const response = await fetch(endpoint);
       
       if (!response.ok) {
@@ -89,11 +89,11 @@ export default function ProdutoFornecedorForm({ modo, item, onClose }: ProdutoFo
 
       // Filtra os itens já vinculados e que correspondem à busca
       const filteredData = data.filter((d: any) => {
-        const nome = modo === 'produto' ? d.nomerazao : d.nome;
-        const codigo = modo === 'produto' ? d.codforn : d.codprod;
+        const nome = d.nomerazao;
+        const codigo = modo === 'transportadora' ? d.codforn : d.codtrans;
         
         const jaVinculado = vinculados.some((v: any) => 
-          modo === 'produto' ? v.codforn === codigo : v.codprod === codigo
+          modo === 'transportadora' ? v.codforn === codigo : v.codtrans === codigo
         );
         
         return nome && nome.toLowerCase().includes(query.toLowerCase()) && !jaVinculado;
@@ -112,17 +112,17 @@ export default function ProdutoFornecedorForm({ modo, item, onClose }: ProdutoFo
     try {
       setIsLoading(true);
       
-      const body = modo === 'produto' 
+      const body = modo === 'transportadora' 
         ? { 
-            codprod: (item as Produto).codprod, 
+            codtrans: (item as Transportadora).codtrans, 
             codforn: itemToAdd.codforn
           }
         : { 
-            codprod: itemToAdd.codprod, 
+            codtrans: itemToAdd.codtrans, 
             codforn: (item as Fornecedor).codforn
           };
 
-      const response = await fetch('/api/produto-forn', {
+      const response = await fetch('/api/transp-forn', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
@@ -130,8 +130,8 @@ export default function ProdutoFornecedorForm({ modo, item, onClose }: ProdutoFo
 
       if (response.ok) {
         toast.success('Vínculo adicionado com sucesso!');
-      setSearch('');
-      setSuggestions([]);
+        setSearch('');
+        setSuggestions([]);
         await carregarVinculados(); // Recarregar a lista
       } else {
         const error = await response.json();
@@ -150,11 +150,11 @@ export default function ProdutoFornecedorForm({ modo, item, onClose }: ProdutoFo
     try {
       setIsLoading(true);
       
-      const params = modo === 'produto'
-        ? `codprod=${(item as Produto).codprod}&codforn=${itemToRemove.codforn}`
-        : `codprod=${itemToRemove.codprod}&codforn=${(item as Fornecedor).codforn}`;
+      const params = modo === 'transportadora'
+        ? `codtrans=${(item as Transportadora).codtrans}&codforn=${itemToRemove.codforn}`
+        : `codtrans=${itemToRemove.codtrans}&codforn=${(item as Fornecedor).codforn}`;
 
-      const response = await fetch(`/api/produto-forn?${params}`, {
+      const response = await fetch(`/api/transp-forn?${params}`, {
         method: 'DELETE'
       });
 
@@ -188,13 +188,13 @@ export default function ProdutoFornecedorForm({ modo, item, onClose }: ProdutoFo
   const vinculadosFiltrados = vinculados.filter((vinculo) => {
     if (!searchVinculados) return true;
     
-    const nome = modo === 'produto' 
+    const nome = modo === 'transportadora' 
       ? vinculo.nome_fornecedor 
-      : vinculo.nome_produto;
+      : vinculo.nome_transportadora;
     
-    const codigo = modo === 'produto' 
+    const codigo = modo === 'transportadora' 
       ? vinculo.codforn.toString()
-      : vinculo.codprod.toString();
+      : vinculo.codtrans.toString();
     
     return nome?.toLowerCase().includes(searchVinculados.toLowerCase()) ||
            codigo.includes(searchVinculados);
@@ -202,10 +202,10 @@ export default function ProdutoFornecedorForm({ modo, item, onClose }: ProdutoFo
 
   return (
     <div className="space-y-6">
-      {/* Campo de busca para adicionar */}
+      {/* Campo de busca */}
       <div className="space-y-2">
         <Label htmlFor="search">
-          Buscar {modo === 'produto' ? 'Fornecedor' : 'Produto'}
+          Buscar {modo === 'transportadora' ? 'Fornecedor' : 'Transportadora'}
         </Label>
         <div className="relative">
           <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -216,7 +216,7 @@ export default function ProdutoFornecedorForm({ modo, item, onClose }: ProdutoFo
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-10 pr-10"
-            placeholder={`Digite o nome ${modo === 'produto' ? 'do fornecedor' : 'do produto'}...`}
+            placeholder={`Digite o nome ${modo === 'transportadora' ? 'do fornecedor' : 'da transportadora'}...`}
             disabled={isLoading}
           />
           
@@ -230,17 +230,15 @@ export default function ProdutoFornecedorForm({ modo, item, onClose }: ProdutoFo
         {/* Sugestões de busca */}
         {suggestions.length > 0 && (
           <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto">
-            {suggestions.map((suggestion) => (
+            {suggestions.map((suggestion, index) => (
               <div
-                key={modo === 'produto' ? suggestion.codforn : suggestion.codprod}
+                key={index}
                 className="p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0 transition-colors"
                 onClick={() => handleSelectSuggestion(suggestion)}
               >
-                <div className="font-medium text-gray-900">
-                  {modo === 'produto' ? suggestion.nomerazao : suggestion.nome}
-                </div>
+                <div className="font-medium text-gray-900">{suggestion.nomerazao}</div>
                 <div className="text-sm text-gray-500">
-                  Código: {modo === 'produto' ? suggestion.codforn : suggestion.codprod}
+                  Código: {modo === 'transportadora' ? suggestion.codforn : suggestion.codtrans}
                 </div>
               </div>
             ))}
@@ -252,9 +250,9 @@ export default function ProdutoFornecedorForm({ modo, item, onClose }: ProdutoFo
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <Label className="text-base font-medium text-gray-900">
-            {modo === 'produto' 
+            {modo === 'transportadora' 
               ? `Fornecedores Vinculados`
-              : `Produtos Vinculados`
+              : `Transportadoras Vinculadas`
             }
           </Label>
           <div className="flex items-center gap-2">
@@ -278,7 +276,7 @@ export default function ProdutoFornecedorForm({ modo, item, onClose }: ProdutoFo
               value={searchVinculados}
               onChange={(e) => setSearchVinculados(e.target.value)}
               className="pl-10"
-              placeholder={`Filtrar ${modo === 'produto' ? 'fornecedores' : 'produtos'} vinculados...`}
+              placeholder={`Filtrar ${modo === 'transportadora' ? 'fornecedores' : 'transportadoras'} vinculados...`}
             />
             {searchVinculados && (
               <button
@@ -292,6 +290,7 @@ export default function ProdutoFornecedorForm({ modo, item, onClose }: ProdutoFo
         )}
         
         <div className="border border-gray-200 rounded-lg overflow-hidden">
+        
           <div className="max-h-80 overflow-y-auto">
             {isLoading ? (
               <div className="p-8 text-center">
@@ -307,7 +306,7 @@ export default function ProdutoFornecedorForm({ modo, item, onClose }: ProdutoFo
                 </div>
                 <h3 className="text-sm font-medium text-gray-900 mb-1">Nenhum vínculo encontrado</h3>
                 <p className="text-sm text-gray-500">
-                  Use o campo de busca acima para adicionar {modo === 'produto' ? 'fornecedores' : 'produtos'}.
+                  Use o campo de busca acima para adicionar {modo === 'transportadora' ? 'fornecedores' : 'transportadoras'}.
                 </p>
               </div>
             ) : vinculadosFiltrados.length === 0 ? (
@@ -329,21 +328,18 @@ export default function ProdutoFornecedorForm({ modo, item, onClose }: ProdutoFo
               </div>
             ) : (
               <div className="divide-y divide-gray-100">
-                {vinculadosFiltrados.map((vinculado) => (
-                  <div
-                    key={modo === 'produto' ? vinculado.codforn : vinculado.codprod}
-                    className="p-4 flex justify-between items-center hover:bg-gray-50 transition-colors"
-                  >
+                {vinculadosFiltrados.map((vinculo, index) => (
+                  <div key={index} className="p-4 flex justify-between items-center hover:bg-gray-50 transition-colors">
                     <div className="flex-1">
                       <div className="font-medium text-gray-900">
-                        {modo === 'produto' ? vinculado.nome_fornecedor : vinculado.nome_produto}
+                        {modo === 'transportadora' ? vinculo.nome_fornecedor : vinculo.nome_transportadora}
                       </div>
                       <div className="text-sm text-gray-500 mt-1">
-                        Código: {modo === 'produto' ? vinculado.codforn : vinculado.codprod}
+                        Código: {modo === 'transportadora' ? vinculo.codforn : vinculo.codtrans}
                       </div>
                     </div>
                     <Button
-                      onClick={() => handleRemove(vinculado)}
+                      onClick={() => handleRemove(vinculo)}
                       disabled={isLoading}
                       variant="outline"
                       size="sm"
@@ -366,7 +362,6 @@ export default function ProdutoFornecedorForm({ modo, item, onClose }: ProdutoFo
           onClick={onClose}
           variant="outline"
           className="min-w-[100px]"
-          disabled={isLoading}
         >
           Fechar
         </Button>
@@ -374,6 +369,3 @@ export default function ProdutoFornecedorForm({ modo, item, onClose }: ProdutoFo
     </div>
   );
 } 
- 
- 
- 

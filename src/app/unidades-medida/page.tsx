@@ -14,79 +14,66 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PlusIcon, MagnifyingGlassIcon, EyeIcon, PencilIcon } from '@heroicons/react/24/outline';
-import { EstadoSelect } from '@/components/forms/EstadoSelect';
 
-interface Cidade {
-  codcid: number;
-  nomecidade: string;
-  codest: number;
-  nomeestado?: string;
-  siglaest?: string;
-  nomepais?: string;
+interface UnidadeMedida {
+  codunidade: number;
+  nome_unidade: string;
+  sigla_unidade: string;
   data_criacao?: string;
   data_alteracao?: string;
   situacao?: string;
 }
 
-interface Estado {
-  codest: number;
-  siglaest: string;
-  nomeestado: string;
-  codpais: number;
-  nomepais?: string;
-}
-
-export default function CidadesPage() {
-  const [cidades, setCidades] = useState<Cidade[]>([]);
+export default function UnidadesMedidaPage() {
+  const [unidades, setUnidades] = useState<UnidadeMedida[]>([]);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
-  const [cidadeToDelete, setCidadeToDelete] = useState<Cidade | null>(null);
-  const [selectedCidade, setSelectedCidade] = useState<Cidade | null>(null);
+  const [unidadeToDelete, setUnidadeToDelete] = useState<UnidadeMedida | null>(null);
+  const [selectedUnidade, setSelectedUnidade] = useState<UnidadeMedida | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [formData, setFormData] = useState<Cidade>({
-    codcid: 0,
-    nomecidade: '',
-    codest: 0,
+  const [formData, setFormData] = useState<UnidadeMedida>({
+    codunidade: 0,
+    nome_unidade: '',
+    sigla_unidade: '',
     situacao: undefined
   });
   const [isEditing, setIsEditing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [sortKey, setSortKey] = useState<keyof Cidade>('nomecidade');
+  const [sortKey, setSortKey] = useState<keyof UnidadeMedida>('nome_unidade');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
-  const [selectedEstado, setSelectedEstado] = useState<Estado | null>(null);
 
   useEffect(() => {
-    fetchCidades();
+    fetchUnidades();
   }, []);
 
-  const fetchCidades = async () => {
+  const fetchUnidades = async () => {
     try {
-      const response = await fetch('/api/cidades');
-      if (!response.ok) throw new Error('Erro ao carregar cidades');
+      const response = await fetch('/api/unidades-medida');
+      if (!response.ok) throw new Error('Erro ao carregar unidades de medida');
       const data = await response.json();
-      setCidades(data);
+      setUnidades(data);
     } catch (error) {
       console.error('Erro:', error);
-      toast.error('Erro ao carregar cidades');
+      toast.error('Erro ao carregar unidades de medida');
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validação básica
-    if (!formData.nomecidade.trim()) {
-      toast.error('Nome da cidade é obrigatório');
+    // Validações básicas
+    if (!formData.nome_unidade.trim()) {
+      toast.error('Nome da unidade é obrigatório');
       return;
     }
 
-    if (!selectedEstado || !formData.codest) {
-      toast.error('Estado é obrigatório');
+    if (!formData.sigla_unidade.trim()) {
+      toast.error('Sigla da unidade é obrigatória');
       return;
     }
 
     try {
-      const response = await fetch('/api/cidades', {
+      const response = await fetch('/api/unidades-medida', {
         method: isEditing ? 'PUT' : 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -97,57 +84,44 @@ export default function CidadesPage() {
       const data = await response.json();
 
       if (response.ok) {
-        await fetchCidades();
+        await fetchUnidades();
         setIsFormOpen(false);
         setFormData({
-          codcid: 0,
-          nomecidade: '',
-          codest: 0,
+          codunidade: 0,
+          nome_unidade: '',
+          sigla_unidade: '',
           situacao: undefined
         });
-        setSelectedEstado(null);
         setIsEditing(false);
-        toast.success(isEditing ? 'Cidade atualizada com sucesso!' : 'Cidade cadastrada com sucesso!');
+        toast.success(isEditing ? 'Unidade atualizada com sucesso!' : 'Unidade cadastrada com sucesso!');
       } else {
-        toast.error(data.error || 'Erro ao salvar cidade');
+        toast.error(data.error || 'Erro ao salvar unidade');
       }
     } catch (error) {
       console.error('Erro:', error);
-      toast.error('Erro ao salvar cidade');
+      toast.error('Erro ao salvar unidade');
     }
   };
 
-  const handleEdit = (cidade: Cidade) => {
+  const handleEdit = (unidade: UnidadeMedida) => {
     setFormData({
-      codcid: cidade.codcid,
-      nomecidade: cidade.nomecidade,
-      codest: cidade.codest,
-      situacao: cidade.situacao
+      codunidade: unidade.codunidade,
+      nome_unidade: unidade.nome_unidade,
+      sigla_unidade: unidade.sigla_unidade,
+      situacao: unidade.situacao
     });
-    
-    // Configurar estado selecionado para o EstadoSelect
-    if (cidade.codest && cidade.nomeestado) {
-      setSelectedEstado({
-        codest: cidade.codest,
-        siglaest: cidade.siglaest || '',
-        nomeestado: cidade.nomeestado,
-        codpais: 0, // Será carregado pelo componente
-        nomepais: cidade.nomepais
-      });
-    }
-    
     setIsEditing(true);
     setIsFormOpen(true);
   };
 
-  const handleOpenDetailsModal = (cidade: Cidade) => {
-    setSelectedCidade(cidade);
+  const handleOpenDetailsModal = (unidade: UnidadeMedida) => {
+    setSelectedUnidade(unidade);
     setIsDetailsModalOpen(true);
   };
 
   const handleCloseDetailsModal = () => {
     setIsDetailsModalOpen(false);
-    setSelectedCidade(null);
+    setSelectedUnidade(null);
   };
 
   const formatDateTime = (dateString: string) => {
@@ -164,29 +138,29 @@ export default function CidadesPage() {
   };
 
   const handleDelete = async () => {
-    if (!cidadeToDelete) return;
+    if (!unidadeToDelete) return;
 
     try {
-      const response = await fetch(`/api/cidades?codcid=${cidadeToDelete.codcid}`, {
+      const response = await fetch(`/api/unidades-medida?codunidade=${unidadeToDelete.codunidade}`, {
         method: 'DELETE',
       });
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || 'Erro ao excluir cidade');
+        throw new Error(error.error || 'Erro ao excluir unidade');
       }
 
-      toast.success('Cidade excluída com sucesso!');
-      fetchCidades();
+      toast.success('Unidade excluída com sucesso!');
+      fetchUnidades();
       setIsDeleteDialogOpen(false);
-      setCidadeToDelete(null);
+      setUnidadeToDelete(null);
     } catch (error) {
       console.error('Erro:', error);
-      toast.error(error instanceof Error ? error.message : 'Erro ao excluir cidade');
+      toast.error(error instanceof Error ? error.message : 'Erro ao excluir unidade');
     }
   };
 
-  const handleSort = (key: keyof Cidade) => {
+  const handleSort = (key: keyof UnidadeMedida) => {
     if (sortKey === key) {
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
     } else {
@@ -195,18 +169,11 @@ export default function CidadesPage() {
     }
   };
 
-  const handleEstadoSelect = (estado: Estado | null) => {
-    setSelectedEstado(estado);
-    setFormData({ ...formData, codest: estado?.codest || 0 });
-  };
-
-  const filteredAndSortedCidades = cidades
-    .filter(cidade => 
-      cidade.codcid.toString().toLowerCase().includes(searchTerm.toLowerCase()) ||
-      cidade.nomecidade.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (cidade.nomeestado || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (cidade.siglaest || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (cidade.nomepais || '').toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredAndSortedUnidades = unidades
+    .filter(unidade => 
+      unidade.codunidade.toString().toLowerCase().includes(searchTerm.toLowerCase()) ||
+      unidade.nome_unidade.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      unidade.sigla_unidade.toLowerCase().includes(searchTerm.toLowerCase())
     )
     .sort((a, b) => {
       const aValue = String(a[sortKey]);
@@ -217,19 +184,17 @@ export default function CidadesPage() {
     });
 
   const columns = [
-    { key: 'codcid', label: 'Código' },
-    { key: 'nomecidade', label: 'Nome da Cidade' },
-    { key: 'siglaest', label: 'UF' },
-    { key: 'nomeestado', label: 'Estado' },
-    { key: 'nomepais', label: 'País' },
+    { key: 'codunidade', label: 'Código' },
+    { key: 'nome_unidade', label: 'Nome da Unidade' },
+    { key: 'sigla_unidade', label: 'Sigla' },
     {
       key: 'situacao',
       label: 'Status',
-      render: (cidade: Cidade) => (
+      render: (unidade: UnidadeMedida) => (
         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-          cidade.situacao ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
+          unidade.situacao ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
         }`}>
-          {cidade.situacao ? '🔴 Inativa' : '🟢 Ativa'}
+          {unidade.situacao ? '🔴 Inativa' : '🟢 Ativa'}
         </span>
       )
     }
@@ -239,16 +204,16 @@ export default function CidadesPage() {
     <div className="px-4 sm:px-6 lg:px-8">
       <div className="sm:flex sm:items-center">
         <div className="sm:flex-auto">
-          <h1 className="text-base font-semibold leading-6 text-gray-900">Cidades</h1>
+          <h1 className="text-base font-semibold leading-6 text-gray-900">Unidades de Medida</h1>
           <p className="mt-2 text-sm text-gray-700">
-            Lista de todas as cidades cadastradas no sistema.
+            Lista de todas as unidades de medida cadastradas no sistema.
           </p>
         </div>
         <div className="mt-4 sm:ml-16 sm:mt-0 sm:flex-none flex items-center gap-3">
           <div className="relative">
             <Input
               type="text"
-              placeholder="Buscar cidade..."
+              placeholder="Buscar unidade..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-[320px] pl-10"
@@ -258,26 +223,25 @@ export default function CidadesPage() {
           <Button
             onClick={() => {
               setFormData({
-                codcid: 0,
-                nomecidade: '',
-                codest: 0,
+                codunidade: 0,
+                nome_unidade: '',
+                sigla_unidade: '',
                 situacao: undefined
               });
-              setSelectedEstado(null);
               setIsEditing(false);
               setIsFormOpen(true);
             }}
             className="bg-violet-600 hover:bg-violet-500"
           >
             <PlusIcon className="h-5 w-5 mr-2" />
-            Nova Cidade
+            Nova Unidade
           </Button>
         </div>
       </div>
 
       <div className="mt-6">
         <DataTable
-          data={filteredAndSortedCidades}
+          data={filteredAndSortedUnidades}
           columns={columns}
           actions={[
             {
@@ -287,8 +251,8 @@ export default function CidadesPage() {
             }
           ]}
           onEdit={handleEdit}
-          onDelete={(cidade) => {
-            setCidadeToDelete(cidade);
+          onDelete={(unidade) => {
+            setUnidadeToDelete(unidade);
             setIsDeleteDialogOpen(true);
           }}
           sortKey={sortKey}
@@ -301,15 +265,15 @@ export default function CidadesPage() {
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{isEditing ? 'Editar Cidade' : 'Nova Cidade'}</DialogTitle>
+            <DialogTitle>{isEditing ? 'Editar Unidade de Medida' : 'Nova Unidade de Medida'}</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <Label htmlFor="codcid">Código</Label>
+                <Label htmlFor="codunidade">Código</Label>
                 <Input
-                  id="codcid"
-                  value={isEditing ? formData.codcid : ''}
+                  id="codunidade"
+                  value={isEditing ? formData.codunidade : ''}
                   disabled
                   className="bg-gray-50"
                   placeholder={isEditing ? '' : 'Auto'}
@@ -338,23 +302,28 @@ export default function CidadesPage() {
               </div>
             </div>
             <div>
-              <Label htmlFor="nomecidade">Nome da Cidade *</Label>
+              <Label htmlFor="nome_unidade">Nome da Unidade *</Label>
               <Input
-                id="nomecidade"
-                value={formData.nomecidade}
-                onChange={(e) => setFormData({ ...formData, nomecidade: e.target.value })}
-                placeholder="Digite o nome da cidade"
+                id="nome_unidade"
+                value={formData.nome_unidade}
+                onChange={(e) => setFormData({ ...formData, nome_unidade: e.target.value })}
+                placeholder="Digite o nome da unidade (ex: Quilograma, Metro, Litro)"
                 required
-                maxLength={100}
+                maxLength={50}
               />
             </div>
             <div>
-              <Label>Estado *</Label>
-              <EstadoSelect
-                value={selectedEstado}
-                onChange={handleEstadoSelect}
-                error={(!selectedEstado || !formData.codest) ? 'Estado é obrigatório' : undefined}
+              <Label htmlFor="sigla_unidade">Sigla da Unidade *</Label>
+              <Input
+                id="sigla_unidade"
+                value={formData.sigla_unidade}
+                onChange={(e) => setFormData({ ...formData, sigla_unidade: e.target.value.toUpperCase() })}
+                placeholder="Digite a sigla (ex: KG, M, L)"
+                required
+                maxLength={10}
+                className="uppercase"
               />
+              <p className="text-xs text-gray-500 mt-1">A sigla será automaticamente convertida para maiúsculo</p>
             </div>
             <DialogFooter>
               <Button
@@ -378,11 +347,11 @@ export default function CidadesPage() {
           <DialogHeader>
             <DialogTitle className="text-xl font-semibold text-gray-900 flex items-center gap-2">
               <EyeIcon className="h-5 w-5 text-violet-600" />
-              Detalhes da Cidade
+              Detalhes da Unidade de Medida
             </DialogTitle>
           </DialogHeader>
           
-          {selectedCidade && (
+          {selectedUnidade && (
             <div className="space-y-8">
               {/* Identificação */}
               <div>
@@ -393,49 +362,25 @@ export default function CidadesPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
                   <div className="flex justify-between items-center py-2 border-b border-gray-100">
                     <span className="text-sm font-medium text-gray-600">Código:</span>
-                    <span className="text-sm font-mono text-gray-900 bg-gray-50 px-2 py-1 rounded">{selectedCidade.codcid}</span>
+                    <span className="text-sm font-mono text-gray-900 bg-gray-50 px-2 py-1 rounded">{selectedUnidade.codunidade}</span>
                   </div>
                   <div className="flex justify-between items-center py-2 border-b border-gray-100">
                     <span className="text-sm font-medium text-gray-600">Status:</span>
                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                      selectedCidade.situacao ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
+                      selectedUnidade.situacao ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
                     }`}>
-                      {selectedCidade.situacao ? '🔴 Inativa' : '🟢 Ativa'}
+                      {selectedUnidade.situacao ? '🔴 Inativa' : '🟢 Ativa'}
                     </span>
                   </div>
-                  <div className="md:col-span-2">
-                    <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                      <span className="text-sm font-medium text-gray-600">Nome da Cidade:</span>
-                      <span className="text-sm font-semibold text-gray-900 text-right max-w-[300px]">{selectedCidade.nomecidade}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Localização */}
-              <div className="pt-6 border-t border-gray-200">
-                <div className="flex items-center gap-2 mb-4">
-                  <div className="w-1 h-6 bg-blue-600 rounded-full"></div>
-                  <h3 className="text-lg font-semibold text-gray-900">Localização</h3>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
                   <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                    <span className="text-sm font-medium text-gray-600">Estado:</span>
-                    <span className="text-sm font-semibold text-gray-900 text-right max-w-[200px]">{selectedCidade.nomeestado || '-'}</span>
+                    <span className="text-sm font-medium text-gray-600">Nome da Unidade:</span>
+                    <span className="text-sm font-semibold text-gray-900 text-right max-w-[200px]">{selectedUnidade.nome_unidade}</span>
                   </div>
                   <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                    <span className="text-sm font-medium text-gray-600">UF:</span>
+                    <span className="text-sm font-medium text-gray-600">Sigla:</span>
                     <span className="text-sm font-mono text-gray-900 bg-blue-50 px-3 py-2 rounded font-bold text-blue-800">
-                      {selectedCidade.siglaest || '-'}
+                      {selectedUnidade.sigla_unidade}
                     </span>
-                  </div>
-                  <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                    <span className="text-sm font-medium text-gray-600">País:</span>
-                    <span className="text-sm font-semibold text-gray-900 text-right max-w-[200px]">{selectedCidade.nomepais || '-'}</span>
-                  </div>
-                  <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                    <span className="text-sm font-medium text-gray-600">Código do Estado:</span>
-                    <span className="text-sm font-mono text-gray-900 bg-gray-50 px-2 py-1 rounded">{selectedCidade.codest}</span>
                   </div>
                 </div>
               </div>
@@ -450,13 +395,13 @@ export default function CidadesPage() {
                   <div className="flex justify-between items-center py-2 border-b border-gray-100">
                     <span className="text-sm font-medium text-gray-600">Data de Criação:</span>
                     <span className="text-sm font-mono text-gray-900 bg-gray-50 px-2 py-1 rounded">
-                      {formatDateTime(selectedCidade.data_criacao || '')}
+                      {formatDateTime(selectedUnidade.data_criacao || '')}
                     </span>
                   </div>
                   <div className="flex justify-between items-center py-2 border-b border-gray-100">
                     <span className="text-sm font-medium text-gray-600">Última Atualização:</span>
                     <span className="text-sm font-mono text-gray-900 bg-gray-50 px-2 py-1 rounded">
-                      {formatDateTime(selectedCidade.data_alteracao || '')}
+                      {formatDateTime(selectedUnidade.data_alteracao || '')}
                     </span>
                   </div>
                 </div>
@@ -471,7 +416,7 @@ export default function CidadesPage() {
             <Button 
               onClick={() => {
                 handleCloseDetailsModal();
-                handleEdit(selectedCidade!);
+                handleEdit(selectedUnidade!);
               }}
               className="bg-violet-600 hover:bg-violet-500"
             >
@@ -489,9 +434,9 @@ export default function CidadesPage() {
             <DialogTitle>Confirmar Exclusão</DialogTitle>
           </DialogHeader>
           <div className="py-4">
-            <p>Tem certeza que deseja excluir a cidade <strong>{cidadeToDelete?.nomecidade}</strong>?</p>
+            <p>Tem certeza que deseja excluir a unidade <strong>{unidadeToDelete?.nome_unidade} ({unidadeToDelete?.sigla_unidade})</strong>?</p>
             <p className="text-sm text-gray-600 mt-2">
-              Esta ação não poderá ser desfeita e não será possível excluir se houver empresas ou pessoas vinculadas.
+              Esta ação não poderá ser desfeita e não será possível excluir se houver produtos vinculados.
             </p>
           </div>
           <DialogFooter>

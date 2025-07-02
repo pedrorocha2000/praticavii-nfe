@@ -11,7 +11,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import CondicoesPagamentoForm from './CondicoesPagamentoForm';
@@ -34,17 +33,21 @@ interface CondicaoPagamentoSelectProps {
   value: CondicaoPagamento | null;
   onChange: (condicao: CondicaoPagamento | null) => void;
   required?: boolean;
+  error?: string;
+  onCondicaoCreated?: () => void;
 }
 
-export default function CondicaoPagamentoSelect({ value, onChange, required = false }: CondicaoPagamentoSelectProps) {
+export default function CondicaoPagamentoSelect({ value, onChange, required = false, error, onCondicaoCreated }: CondicaoPagamentoSelectProps) {
   const [condicoes, setCondicoes] = useState<CondicaoPagamento[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
 
   useEffect(() => {
-    fetchCondicoes();
-  }, []);
+    if (isModalOpen) {
+      fetchCondicoes();
+    }
+  }, [isModalOpen]);
 
   const fetchCondicoes = async () => {
     try {
@@ -58,55 +61,70 @@ export default function CondicaoPagamentoSelect({ value, onChange, required = fa
     }
   };
 
-  const handleOpenModal = () => {
-    setIsModalOpen(true);
-  };
-
-  const handleCloseModal = () => {
-    setIsModalOpen(false);
-    setSearchTerm('');
-  };
-
   const handleSelect = (condicao: CondicaoPagamento) => {
     onChange(condicao);
-    handleCloseModal();
+    setIsModalOpen(false);
+    setSearchTerm(''); // Limpar busca
   };
 
   const filteredCondicoes = condicoes.filter(condicao =>
+    condicao.codcondpgto.toString().includes(searchTerm.toLowerCase()) ||
     condicao.descricao.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const formatParcelasInfo = (parcelas: CondicaoPagamento['parcelas']) => {
+    if (!parcelas || parcelas.length === 0) return '-';
     return parcelas.map(parcela => 
       `${parcela.percentual}% em ${parcela.dias} dias`
     ).join(' + ');
   };
 
-  return (
-    <div>
-      <Button
-        type="button"
-        variant="outline"
-        className="w-full justify-between"
-        onClick={handleOpenModal}
-      >
-        {value ? value.descricao : "Selecione uma condição de pagamento"}
-      </Button>
+  const columns = [
+    { key: 'descricao', label: 'Descrição', className: 'flex-1' },
+    { 
+      key: 'parcelas', 
+      label: 'Parcelas',
+      className: 'w-96',
+      render: (item: CondicaoPagamento) => formatParcelasInfo(item.parcelas)
+    },
+  ];
 
+  return (
+    <div className="space-y-2">
+      <div className="flex gap-2">
+        <Input
+          value={value?.descricao || ''}
+          readOnly
+          placeholder="Selecione uma condição de pagamento"
+          className={error ? 'border-red-500' : ''}
+        />
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => setIsModalOpen(true)}
+        >
+          Selecionar
+        </Button>
+      </div>
+      {error && <p className="text-sm text-red-500">{error}</p>}
+
+      {/* Dialog de Seleção */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent className="max-w-3xl">
           <DialogHeader>
             <DialogTitle>Selecionar Condição de Pagamento</DialogTitle>
           </DialogHeader>
-
-          <div className="flex justify-between items-center mb-4">
-            <div className="flex gap-2 flex-1">
+          
+          <div className="flex items-center gap-4 mb-4">
+            <div className="flex-1 relative">
               <Input
-                placeholder="Pesquisar..."
+                type="text"
+                placeholder="Buscar condição de pagamento..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="max-w-sm"
+                className="pl-10"
               />
+              <MagnifyingGlassIcon className="h-5 w-5 absolute left-3 top-2.5 text-gray-400" />
             </div>
             <CondicoesPagamentoForm
               isOpen={isFormOpen}
@@ -114,11 +132,15 @@ export default function CondicaoPagamentoSelect({ value, onChange, required = fa
               onSuccess={() => {
                 fetchCondicoes();
                 setIsFormOpen(false);
+                if (onCondicaoCreated) {
+                  onCondicaoCreated();
+                }
+                toast.success('Condição de pagamento cadastrada com sucesso! Agora selecione na lista.');
               }}
               trigger={
-                <Button>
+                <Button className="bg-violet-600 hover:bg-violet-500 shrink-0">
                   <PlusIcon className="h-5 w-5 mr-2" />
-                  Nova Condição
+                  Nova Condição de Pagamento
                 </Button>
               }
             />
@@ -127,24 +149,10 @@ export default function CondicaoPagamentoSelect({ value, onChange, required = fa
           <div className="max-h-[400px] overflow-y-auto">
             <DataTable
               data={filteredCondicoes}
-              columns={[
-                { key: 'codcondpgto', label: 'Código' },
-                { key: 'descricao', label: 'Descrição' },
-                { 
-                  key: 'parcelas', 
-                  label: 'Parcelas',
-                  render: (item: CondicaoPagamento) => formatParcelasInfo(item.parcelas)
-                },
-              ]}
+              columns={columns}
               onRowClick={handleSelect}
             />
           </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={handleCloseModal}>
-              Cancelar
-            </Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
