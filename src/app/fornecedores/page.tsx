@@ -426,8 +426,11 @@ export default function FornecedoresPage() {
       return;
     }
 
-    // Validar condição de pagamento - fornecedores podem não ter condição de pagamento
-    // Não é obrigatório para fornecedores
+    // Validar condição de pagamento
+    if (!selectedCondicaoPagamento || !selectedCondicaoPagamento.codcondpgto) {
+      toast.error('Por favor, selecione uma condição de pagamento');
+      return;
+    }
 
     // Validar CPF/CNPJ apenas para fornecedores do Brasil ou se foi preenchido
     if (selectedCidade.nomepais?.toLowerCase() === 'brasil') {
@@ -735,7 +738,7 @@ export default function FornecedoresPage() {
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="md:col-span-2">
-                  <Label htmlFor="endereco">Endereço</Label>
+                  <Label htmlFor="endereco">Endereço *</Label>
                   <Input
                 id="endereco"
                 value={formData.endereco}
@@ -745,7 +748,7 @@ export default function FornecedoresPage() {
               />
             </div>
             <div>
-                  <Label htmlFor="numero">Número</Label>
+                  <Label htmlFor="numero">Número *</Label>
                   <Input
                 id="numero"
                 value={formData.numero}
@@ -767,7 +770,7 @@ export default function FornecedoresPage() {
               />
             </div>
             <div>
-                  <Label htmlFor="bairro">Bairro</Label>
+                  <Label htmlFor="bairro">Bairro *</Label>
                   <Input
                 id="bairro"
                 value={formData.bairro}
@@ -777,13 +780,14 @@ export default function FornecedoresPage() {
               />
             </div>
             <div>
-                  <Label htmlFor="cep">CEP</Label>
+                  <Label htmlFor="cep">CEP *</Label>
                   <Input
                 id="cep"
                 value={formData.cep}
-                onChange={(e) => setFormData({ ...formData, cep: e.target.value })}
+                onChange={(e) => setFormData({ ...formData, cep: e.target.value.slice(0, 15) })}
                     placeholder="CEP / Código Postal"
                 required
+                maxLength={15}
               />
                 </div>
               </div>
@@ -794,9 +798,7 @@ export default function FornecedoresPage() {
               <h3 className="text-lg font-medium text-gray-900">Dados Pessoais</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="nomerazao">
-                    {formData.tipopessoa === 'F' ? 'Nome' : 'Razão Social'} *
-                  </Label>
+                  <Label htmlFor="nomerazao">{formData.tipopessoa === 'F' ? 'Nome *' : 'Razão Social *'}</Label>
                   <Input
                     id="nomerazao"
                     value={formData.nomerazao}
@@ -806,14 +808,13 @@ export default function FornecedoresPage() {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="nomefantasia">
-                    {formData.tipopessoa === 'F' ? 'Apelido' : 'Nome Fantasia'}
-                  </Label>
+                  <Label htmlFor="nomefantasia">{formData.tipopessoa === 'F' ? 'Apelido *' : 'Nome Fantasia *'}</Label>
                   <Input
                     id="nomefantasia"
                     value={formData.nomefantasia}
                     onChange={(e) => setFormData({ ...formData, nomefantasia: e.target.value })}
                     placeholder={formData.tipopessoa === 'F' ? 'Digite o apelido' : 'Digite o nome fantasia'}
+                    required
                   />
                 </div>
               </div>
@@ -859,27 +860,30 @@ export default function FornecedoresPage() {
                   )}
                 </div>
                 <div>
-                  <Label htmlFor="rg_inscricaoestadual">
-                    {formData.tipopessoa === 'F' ? 'RG' : 'Inscrição Estadual'}
-                  </Label>
+                  <Label htmlFor="rg_inscricaoestadual">{formData.tipopessoa === 'F' ? 'RG *' : 'Inscrição Estadual *'}</Label>
                   <Input
                     id="rg_inscricaoestadual"
                     value={formData.rg_inscricaoestadual}
                     onChange={(e) => setFormData({ ...formData, rg_inscricaoestadual: e.target.value })}
                     placeholder={formData.tipopessoa === 'F' ? 'Digite o RG' : 'Digite a inscrição estadual'}
+                    required
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="telefone">Telefone</Label>
+                  <Label htmlFor="telefone">Telefone *</Label>
                   <Input
                     id="telefone"
                     value={formData.telefone}
-                    onChange={(e) => setFormData({ ...formData, telefone: e.target.value })}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/[^0-9\-\+\(\)\s]/g, '');
+                      setFormData({ ...formData, telefone: value.slice(0, 15) });
+                    }}
                     placeholder="(00) 00000-0000"
                     required
+                    maxLength={15}
                   />
                 </div>
                 <div>
@@ -900,7 +904,7 @@ export default function FornecedoresPage() {
               <h3 className="text-lg font-medium text-gray-900">Dados Comerciais</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <Label>Condição de Pagamento</Label>
+              <Label>Condição de Pagamento *</Label>
               <CondicaoPagamentoSelect
                 value={selectedCondicaoPagamento ? {
                   codcondpgto: selectedCondicaoPagamento.codcondpgto,
@@ -929,7 +933,7 @@ export default function FornecedoresPage() {
                     }}
               />
                   <p className="text-xs text-gray-500 mt-1">
-                    Condição de pagamento é opcional para fornecedores
+                    Condição de pagamento é obrigatória para fornecedores
                   </p>
             </div>
                 <div>
@@ -951,7 +955,7 @@ export default function FornecedoresPage() {
               <Button type="button" variant="outline" onClick={handleCloseModal}>
               Cancelar
               </Button>
-              <Button type="submit">
+              <Button type="submit" className="bg-violet-600 hover:bg-violet-500">
               Salvar
               </Button>
             </DialogFooter>

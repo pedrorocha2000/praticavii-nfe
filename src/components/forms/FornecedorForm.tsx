@@ -1,5 +1,25 @@
 import { useState, useEffect } from 'react';
-import { Fornecedor, CreateFornecedorDTO, UpdateFornecedorDTO } from '@/types/fornecedor';
+
+type Fornecedor = {
+    codforn: number;
+    nomerazao: string;
+    cnpj: string;
+    inscricaoestadual: string;
+    endereco: string;
+    numero: string;
+    complemento: string;
+    bairro: string;
+    cep: string;
+    codcid: number;
+    telefone: string;
+    email: string;
+}
+
+interface CreateFornecedorDTO extends Omit<Fornecedor, 'codforn'> {
+  codforn?: number;
+}
+
+interface UpdateFornecedorDTO extends Partial<CreateFornecedorDTO> {}
 
 interface FornecedorFormProps {
   fornecedor?: Fornecedor;

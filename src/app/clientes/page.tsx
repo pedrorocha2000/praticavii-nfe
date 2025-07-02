@@ -44,6 +44,7 @@ interface Cliente {
   data_criacao?: string;
   data_alteracao?: string;
   situacao?: boolean;
+  limite_credito?: number;
 }
 
 export default function ClientesPage() {
@@ -71,6 +72,7 @@ export default function ClientesPage() {
     codcondpgto: 0,
     condicao_pagamento: '',
     situacao: undefined,
+    limite_credito: 0.00,
   });
   const [sortConfig, setSortConfig] = useState<{
     key: keyof Cliente;
@@ -211,6 +213,7 @@ export default function ClientesPage() {
         codcondpgto: cliente.codcondpgto,
         condicao_pagamento: cliente.condicao_pagamento,
         situacao: cliente.situacao,
+        limite_credito: cliente.limite_credito || 0.00,
       });
     } else {
       setSelectedCliente(null);
@@ -235,6 +238,7 @@ export default function ClientesPage() {
         codcondpgto: 0,
         condicao_pagamento: '',
         situacao: undefined,
+        limite_credito: 0.00,
       });
     }
     
@@ -394,6 +398,18 @@ export default function ClientesPage() {
     // Validar condição de pagamento
     if (!selectedCondicaoPagamento) {
       toast.error('Por favor, selecione uma condição de pagamento');
+      return;
+    }
+
+    // Validar apelido/nome fantasia
+    if (!formData.nomefantasia.trim()) {
+      toast.error(formData.tipopessoa === 'F' ? 'Apelido é obrigatório' : 'Nome Fantasia é obrigatório');
+      return;
+    }
+
+    // Validar RG/Inscrição Estadual
+    if (!formData.rg_inscricaoestadual.trim()) {
+      toast.error(formData.tipopessoa === 'F' ? 'RG é obrigatório' : 'Inscrição Estadual é obrigatória');
       return;
     }
 
@@ -630,7 +646,7 @@ export default function ClientesPage() {
                   />
                 </div>
               <div>
-                <Label htmlFor="tipopessoa">Tipo de Pessoa</Label>
+                <Label htmlFor="tipopessoa">Tipo de Pessoa *</Label>
                 <select
                   id="tipopessoa"
                   value={formData.tipopessoa}
@@ -692,7 +708,7 @@ export default function ClientesPage() {
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="md:col-span-2">
-                  <Label htmlFor="endereco">Endereço</Label>
+                  <Label htmlFor="endereco">Endereço *</Label>
                   <Input
                     id="endereco"
                     value={formData.endereco}
@@ -702,7 +718,7 @@ export default function ClientesPage() {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="numero">Número</Label>
+                  <Label htmlFor="numero">Número *</Label>
                   <Input
                     id="numero"
                     value={formData.numero}
@@ -724,7 +740,7 @@ export default function ClientesPage() {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="bairro">Bairro</Label>
+                  <Label htmlFor="bairro">Bairro *</Label>
                   <Input
                     id="bairro"
                     value={formData.bairro}
@@ -734,13 +750,14 @@ export default function ClientesPage() {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="cep">CEP</Label>
+                  <Label htmlFor="cep">CEP *</Label>
                   <Input
                     id="cep"
                     value={formData.cep}
                     onChange={(e) => setFormData({ ...formData, cep: e.target.value })}
                     placeholder="CEP / Código Postal"
                     required
+                    maxLength={15}
                   />
                 </div>
               </div>
@@ -764,13 +781,14 @@ export default function ClientesPage() {
                 </div>
                 <div>
                   <Label htmlFor="nomefantasia">
-                    {formData.tipopessoa === 'F' ? 'Apelido' : 'Nome Fantasia'}
+                    {formData.tipopessoa === 'F' ? 'Apelido' : 'Nome Fantasia'} *
                   </Label>
                   <Input
                     id="nomefantasia"
                     value={formData.nomefantasia}
                     onChange={(e) => setFormData({ ...formData, nomefantasia: e.target.value })}
                     placeholder={formData.tipopessoa === 'F' ? 'Digite o apelido' : 'Digite o nome fantasia'}
+                    required
                   />
                 </div>
               </div>
@@ -817,26 +835,34 @@ export default function ClientesPage() {
                 </div>
                 <div>
                   <Label htmlFor="rg_inscricaoestadual">
-                    {formData.tipopessoa === 'F' ? 'RG' : 'Inscrição Estadual'}
+                    {formData.tipopessoa === 'F' ? 'RG' : 'Inscrição Estadual'} *
                   </Label>
                   <Input
                     id="rg_inscricaoestadual"
                     value={formData.rg_inscricaoestadual}
                     onChange={(e) => setFormData({ ...formData, rg_inscricaoestadual: e.target.value })}
                     placeholder={formData.tipopessoa === 'F' ? 'Digite o RG' : 'Digite a inscrição estadual'}
+                    required
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="telefone">Telefone</Label>
+                  <Label htmlFor="telefone">Telefone *</Label>
                   <Input
                     id="telefone"
                     value={formData.telefone}
-                    onChange={(e) => setFormData({ ...formData, telefone: e.target.value })}
+                    onChange={(e) => {
+                      // Permite apenas números, hífen, parênteses, espaço e +
+                      const value = e.target.value.replace(/[^0-9\-\+\(\)\s]/g, '');
+                      // Limita a 15 caracteres
+                      const limitedValue = value.slice(0, 15);
+                      setFormData({ ...formData, telefone: limitedValue });
+                    }}
                     placeholder="(00) 00000-0000"
                     required
+                    maxLength={15}
                   />
                 </div>
                 <div>
@@ -887,6 +913,18 @@ export default function ClientesPage() {
                     }}
                   />
                 </div>
+                <div>
+                  <Label htmlFor="limite_credito">Limite de Crédito (R$)</Label>
+                  <Input
+                    id="limite_credito"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={formData.limite_credito || 0}
+                    onChange={(e) => setFormData({ ...formData, limite_credito: parseFloat(e.target.value) || 0 })}
+                    placeholder="0.00"
+                  />
+                </div>
               </div>
             </div>
 
@@ -894,7 +932,7 @@ export default function ClientesPage() {
               <Button type="button" variant="outline" onClick={handleCloseModal}>
                 Cancelar
               </Button>
-              <Button type="submit">
+              <Button type="submit" className="bg-violet-600 hover:bg-violet-500">
                 Salvar
               </Button>
             </DialogFooter>

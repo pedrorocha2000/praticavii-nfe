@@ -452,6 +452,48 @@ export default function FuncionariosPage() {
       return;
     }
 
+    // Validar apelido
+    if (!formData.nomefantasia.trim()) {
+      toast.error('Apelido é obrigatório');
+      return;
+    }
+
+    // Validar RG
+    if (!formData.rg_inscricaoestadual.trim()) {
+      toast.error('RG é obrigatório');
+      return;
+    }
+
+    // Validar endereço
+    if (!formData.endereco.trim()) {
+      toast.error('Endereço é obrigatório');
+      return;
+    }
+
+    // Validar número
+    if (!formData.numero.trim()) {
+      toast.error('Número é obrigatório');
+      return;
+    }
+
+    // Validar bairro
+    if (!formData.bairro.trim()) {
+      toast.error('Bairro é obrigatório');
+      return;
+    }
+
+    // Validar CEP
+    if (!formData.cep.trim()) {
+      toast.error('CEP é obrigatório');
+      return;
+    }
+
+    // Validar telefone
+    if (!formData.telefone.trim()) {
+      toast.error('Telefone é obrigatório');
+      return;
+    }
+
     // Validação de CPF para funcionários (sempre Pessoa Física)
     if (formData.cpfcnpj) {
       const cpfNumbers = formData.cpfcnpj.replace(/\D/g, '');
@@ -722,21 +764,23 @@ export default function FuncionariosPage() {
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="md:col-span-2">
-                <Label htmlFor="endereco">Endereço</Label>
+                <Label htmlFor="endereco">Endereço *</Label>
                 <Input
                   id="endereco"
                   value={formData.endereco}
                   onChange={(e) => setFormData({ ...formData, endereco: e.target.value })}
                     placeholder="Rua, Avenida, etc."
+                    required
                 />
               </div>
               <div>
-                <Label htmlFor="numero">Número</Label>
+                <Label htmlFor="numero">Número *</Label>
                 <Input
                   id="numero"
                   value={formData.numero}
                   onChange={(e) => setFormData({ ...formData, numero: e.target.value })}
                     placeholder="123"
+                    required
                 />
               </div>
             </div>
@@ -752,24 +796,26 @@ export default function FuncionariosPage() {
                 />
               </div>
               <div>
-                <Label htmlFor="bairro">Bairro</Label>
+                <Label htmlFor="bairro">Bairro *</Label>
                 <Input
                   id="bairro"
                   value={formData.bairro}
                   onChange={(e) => setFormData({ ...formData, bairro: e.target.value })}
                     placeholder="Nome do bairro"
+                    required
                 />
               </div>
               <div>
-                <Label htmlFor="cep">CEP</Label>
+                <Label htmlFor="cep">CEP *</Label>
                 <Input
                   id="cep"
                   value={formData.cep}
                   onChange={(e) => setFormData({ ...formData, cep: e.target.value })}
                     placeholder="CEP / Código Postal"
-                    maxLength={9}
-                  />
-                </div>
+                    maxLength={15}
+                    required
+                />
+              </div>
               </div>
             </div>
 
@@ -788,12 +834,13 @@ export default function FuncionariosPage() {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="nomefantasia">Apelido</Label>
+                  <Label htmlFor="nomefantasia">Apelido *</Label>
                   <Input
                     id="nomefantasia"
                     value={formData.nomefantasia}
                     onChange={(e) => setFormData({ ...formData, nomefantasia: e.target.value })}
                     placeholder="Digite o apelido"
+                    required
                   />
                 </div>
               </div>
@@ -839,24 +886,33 @@ export default function FuncionariosPage() {
                   )}
                 </div>
                 <div>
-                  <Label htmlFor="rg_inscricaoestadual">RG</Label>
+                  <Label htmlFor="rg_inscricaoestadual">RG *</Label>
                   <Input
                     id="rg_inscricaoestadual"
                     value={formData.rg_inscricaoestadual}
                     onChange={(e) => setFormData({ ...formData, rg_inscricaoestadual: e.target.value })}
                     placeholder="Digite o RG"
+                    required
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="telefone">Telefone</Label>
+                <Label htmlFor="telefone">Telefone *</Label>
                 <Input
                   id="telefone"
                   value={formData.telefone}
-                  onChange={(e) => setFormData({ ...formData, telefone: e.target.value })}
+                  onChange={(e) => {
+                    // Permite apenas números, hífen, parênteses, espaço e +
+                    const value = e.target.value.replace(/[^0-9\-\+\(\)\s]/g, '');
+                    // Limita a 15 caracteres
+                    const limitedValue = value.slice(0, 15);
+                    setFormData({ ...formData, telefone: limitedValue });
+                  }}
                     placeholder="(00) 00000-0000"
+                    required
+                    maxLength={15}
                 />
               </div>
             <div>

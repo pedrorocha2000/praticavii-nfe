@@ -121,9 +121,9 @@ export async function POST(request: Request) {
     } = await request.json();
 
     // Validações obrigatórias
-    if (!nomerazao || !codcid) {
+    if (!nomerazao || !codcid || !nomefantasia || !rg_inscricaoestadual) {
       return NextResponse.json(
-        { error: 'Campos obrigatórios: nome/razão social e cidade' },
+        { error: 'Campos obrigatórios: nome/razão social, cidade, apelido/nome fantasia e RG/inscrição estadual' },
         { status: 400 }
       );
     }
@@ -263,9 +263,9 @@ export async function PUT(request: Request) {
     }
 
     // Validações obrigatórias
-    if (!nomerazao || !codcid) {
+    if (!nomerazao || !codcid || !nomefantasia || !rg_inscricaoestadual) {
         return NextResponse.json(
-        { error: 'Campos obrigatórios: nome/razão social e cidade' },
+        { error: 'Campos obrigatórios: nome/razão social, cidade, apelido/nome fantasia e RG/inscrição estadual' },
           { status: 400 }
         );
       }

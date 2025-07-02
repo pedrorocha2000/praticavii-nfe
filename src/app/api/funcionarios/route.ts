@@ -132,6 +132,62 @@ export async function POST(request: Request) {
       );
     }
 
+    // Validar apelido
+    if (!nomefantasia || nomefantasia.trim() === '') {
+      return NextResponse.json(
+        { error: 'Apelido é obrigatório' },
+        { status: 400 }
+      );
+    }
+
+    // Validar RG
+    if (!rg_inscricaoestadual || rg_inscricaoestadual.trim() === '') {
+      return NextResponse.json(
+        { error: 'RG é obrigatório' },
+        { status: 400 }
+      );
+    }
+
+    // Validar endereço
+    if (!endereco || endereco.trim() === '') {
+      return NextResponse.json(
+        { error: 'Endereço é obrigatório' },
+        { status: 400 }
+      );
+    }
+
+    // Validar número
+    if (!numero || numero.trim() === '') {
+      return NextResponse.json(
+        { error: 'Número é obrigatório' },
+        { status: 400 }
+      );
+    }
+
+    // Validar bairro
+    if (!bairro || bairro.trim() === '') {
+      return NextResponse.json(
+        { error: 'Bairro é obrigatório' },
+        { status: 400 }
+      );
+    }
+
+    // Validar CEP
+    if (!cep || cep.trim() === '') {
+      return NextResponse.json(
+        { error: 'CEP é obrigatório' },
+        { status: 400 }
+      );
+    }
+
+    // Validar telefone
+    if (!telefone || telefone.trim() === '') {
+      return NextResponse.json(
+        { error: 'Telefone é obrigatório' },
+        { status: 400 }
+      );
+    }
+
     // Validar salário
     if (salario <= 0) {
       return NextResponse.json(
@@ -335,6 +391,62 @@ export async function PUT(request: Request) {
     if (!nomerazao || !codcid || !departamento || !data_admissao || !salario || !codfuncao_fk) {
       return NextResponse.json(
         { error: 'Campos obrigatórios: nome/razão social, cidade, departamento, data de admissão, salário e função' },
+        { status: 400 }
+      );
+    }
+
+    // Validar apelido
+    if (!nomefantasia || nomefantasia.trim() === '') {
+      return NextResponse.json(
+        { error: 'Apelido é obrigatório' },
+        { status: 400 }
+      );
+    }
+
+    // Validar RG
+    if (!rg_inscricaoestadual || rg_inscricaoestadual.trim() === '') {
+      return NextResponse.json(
+        { error: 'RG é obrigatório' },
+        { status: 400 }
+      );
+    }
+
+    // Validar endereço
+    if (!endereco || endereco.trim() === '') {
+      return NextResponse.json(
+        { error: 'Endereço é obrigatório' },
+        { status: 400 }
+      );
+    }
+
+    // Validar número
+    if (!numero || numero.trim() === '') {
+      return NextResponse.json(
+        { error: 'Número é obrigatório' },
+        { status: 400 }
+      );
+    }
+
+    // Validar bairro
+    if (!bairro || bairro.trim() === '') {
+      return NextResponse.json(
+        { error: 'Bairro é obrigatório' },
+        { status: 400 }
+      );
+    }
+
+    // Validar CEP
+    if (!cep || cep.trim() === '') {
+      return NextResponse.json(
+        { error: 'CEP é obrigatório' },
+        { status: 400 }
+      );
+    }
+
+    // Validar telefone
+    if (!telefone || telefone.trim() === '') {
+      return NextResponse.json(
+        { error: 'Telefone é obrigatório' },
         { status: 400 }
       );
     }

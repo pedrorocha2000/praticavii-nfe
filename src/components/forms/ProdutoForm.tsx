@@ -1,7 +1,15 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Produto } from '@/types/produto';
+
+type Produto = {
+    codprod: number;
+    nome: string;
+    ncm: string;
+    unidade: string;
+    valorunitario: number;
+    datacadastro?: Date;
+}
 
 interface ProdutoFormProps {
   initialData?: Produto;
